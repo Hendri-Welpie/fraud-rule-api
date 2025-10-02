@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Fraud Rule",
+  "type": "object",
+  "required": ["ruleId", "name", "condition", "actions"],
+  "properties": {
+    "ruleId": {"type":"string"},
+    "name": {"type":"string"},
+    "description": {"type":"string"},
+    "version": {"type":"integer"},
+    "enabled": {"type":"boolean"},
+    "priority": {"type":"integer"},
+    "condition": {"type":"object"},
+    "actions": {"type":"array"}
+  }
+}

@@ -1,0 +1,33 @@
+server:
+  port: 9080
+
+app:
+  schedule:
+    updateRules: "0/59 * * * * *"
+
+spring:
+  application:
+    name: Fraud Rule Api
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5433/frauddb
+    username: postgres
+    password: postgres
+    hikari:
+      schema: fraud
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    schemas: fraud
+
+logging:
+#  pattern:
+#    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  level:
+    root: info
+    org:
+      flywaydb: DEBUG

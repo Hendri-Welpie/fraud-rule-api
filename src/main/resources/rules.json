@@ -1,0 +1,66 @@
+{
+  "created_by": "fraud-admin",
+  "created_at": "2025-09-30T16:00:00Z",
+  "updated_at": "2025-09-30T16:25:00Z",
+  "rules": [
+    {
+      "id": "rule-0001",
+      "name": "High value transfer to new beneficiary",
+      "description": "Block transfers >  1000000.00 to a new beneficiary",
+      "condition": {
+        "type": "AND",
+        "operands": [
+          {
+            "type": "EQUALS",
+            "field": "transferType",
+            "value": "TRANSFER"
+          },
+          {
+            "type": "GREATER_THAN",
+            "field": "transferAmount",
+            "value": 1000000.00
+          },
+          {
+            "type": "EQUALS",
+            "field": "currency",
+            "value": "ZAR"
+          }
+        ]
+      }
+    },
+    {
+      "id": "rule-0002",
+      "name": "Block accounts for beneficiary",
+      "description": "Block transfer for certain blacklisted beneficiaries",
+      "condition": {
+        "type": "AND",
+        "operands": [
+          {
+            "type": "EQUALS",
+            "field": "transactionType",
+            "value": "TRANSFER"
+          },
+          {
+            "type": "EQUALS",
+            "field": "currency",
+            "value": "ZAR"
+          },
+          {
+            "type": "INCLUDE",
+            "field": "beneficiary_account",
+            "value": ["32142347", "57437955", "80923904"]
+          }
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "tags": [
+      "beneficiary",
+      "high-value",
+      "new-beneficiary"
+    ],
+    "ttl_days": 365,
+    "version": 3
+  }
+}
