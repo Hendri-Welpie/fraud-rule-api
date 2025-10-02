@@ -3,74 +3,81 @@ package org.project.fraudruleapi.fraud.evaluator;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.project.fraudruleapi.fraud.model.Condition;
 import org.project.fraudruleapi.fraud.model.RuleDefinition;
 import org.project.fraudruleapi.fraud.model.TransactionDto;
 import org.project.fraudruleapi.rules.model.RuleDto;
+import org.project.fraudruleapi.shared.enums.ConditionalType;
 import org.project.fraudruleapi.shared.exception.ConvertionException;
-import org.springframework.stereotype.Component;
 
 import java.beans.PropertyDescriptor;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 
-@Component
+@Slf4j
 public class FraudEvaluator {
-    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    // Cache reflection results
+    private static final Map<String, Field> FIELD_CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, Method> GETTER_CACHE = new ConcurrentHashMap<>();
+
+    // Operator strategy map
+    private final Map<ConditionalType, BiPredicate<Condition, TransactionDto>> evaluators =
+            Map.ofEntries(
+                    Map.entry(ConditionalType.EQUAL, this::equalsOp),
+                    Map.entry(ConditionalType.EQUALS, this::equalsOp),
+                    Map.entry(ConditionalType.GREATER_THAN, (c, t) -> compareNumeric(c, t) > 0),
+                    Map.entry(ConditionalType.GREAT_THAN_OR_EQUAL, (c, t) -> compareNumeric(c, t) >= 0),
+                    Map.entry(ConditionalType.LESS_THAN, (c, t) -> compareNumeric(c, t) < 0),
+                    Map.entry(ConditionalType.LESS_THAN_OR_EQUAL, (c, t) -> compareNumeric(c, t) <= 0),
+                    Map.entry(ConditionalType.INCLUDE, this::includeOp)
+            );
 
     public List<RuleDefinition> getRules(final RuleDto ruleDto) {
         try {
             JsonNode rulesNode = ruleDto.getData().get("rules");
-
             return objectMapper.readValue(
                     rulesNode.traverse(),
                     new TypeReference<>() {
                     }
             );
         } catch (IOException e) {
-            throw new ConvertionException("Unable to converted rules");
+            log.error("Failed to parse rules from RuleDto", e);
+            throw new ConvertionException("Unable to convert rules");
         }
     }
 
     public boolean evaluateCondition(Condition cond, TransactionDto tx) {
         return switch (cond.type()) {
-            case AND -> cond.operands().stream().allMatch(op -> {
-                try {
-                    return evaluateCondition(op, tx);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
+            case AND -> cond.operands().stream().allMatch(op -> evaluateCondition(op, tx));
+            case OR -> cond.operands().stream().anyMatch(op -> evaluateCondition(op, tx));
+            case NOT -> cond.operands() != null && !cond.operands().isEmpty()
+                    && !evaluateCondition(cond.operands().getFirst(), tx);
+            default -> {
+                BiPredicate<Condition, TransactionDto> evaluator = evaluators.get(cond.type());
+                if (evaluator == null) {
+                    log.error("Unsupported condition type: {}", cond.type());
+                    throw new IllegalArgumentException("Unsupported condition type: " + cond.type());
                 }
-            });
-            case OR -> cond.operands().stream().anyMatch(op -> {
-                try {
-                    return evaluateCondition(op, tx);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            });
-            case NOT -> {
-                if (cond.operands() == null || cond.operands().isEmpty()) yield false;
-                yield !evaluateCondition(cond.operands().getFirst(), tx);
+                yield evaluator.test(cond, tx);
             }
-            case EQUAL, EQUALS -> equalsOp(cond, tx);
-            case GREATER_THAN -> compareNumeric(cond, tx) > 0;
-            case GREAT_THAN_OR_EQUAL -> compareNumeric(cond, tx) >= 0;
-            case LESS_THAN -> compareNumeric(cond, tx) < 0;
-            case LESS_THAN_OR_EQUAL -> compareNumeric(cond, tx) <= 0;
-            case INCLUDE -> includeOp(cond, tx);
-            default -> throw new IllegalArgumentException("Unsupported condition type: " + cond.type());
         };
     }
+
+    // ===== Operator implementations =====
 
     private boolean equalsOp(Condition cond, TransactionDto tx) {
         Object fieldVal = getFieldValue(tx, cond.field());
         Object condVal = cond.value();
+
         if (fieldVal == null && condVal == null) return true;
         if (fieldVal == null) return false;
 
@@ -94,26 +101,28 @@ public class FraudEvaluator {
 
     private int compareNumeric(Condition cond, TransactionDto tx) {
         Object fieldVal = getFieldValue(tx, cond.field());
-        if (fieldVal == null) return -1;
-        double fv;
-        if (fieldVal instanceof Number) {
-            fv = ((Number) fieldVal).doubleValue();
-        } else {
-            try {
-                fv = Double.parseDouble(fieldVal.toString());
-            } catch (Exception ex) {
-                return -1;
-            }
+        if (fieldVal == null) {
+            throw new IllegalArgumentException("Field " + cond.field() + " is null, cannot compare numerically");
         }
+
+        double fv = parseToDouble(fieldVal);
         Double cv = parseToDouble(cond.value());
         return Double.compare(fv, cv);
     }
 
+    // ===== Helper methods =====
+
     private Double parseToDouble(Object value) {
-        if (value == null) return 0.0;
+        if (value == null) {
+            throw new IllegalArgumentException("Cannot parse null to double");
+        }
         if (value instanceof Number) return ((Number) value).doubleValue();
-        String s = value.toString().replaceAll("[^0-9.\\-]", "");
-        return s.isEmpty() ? 0.0 : Double.parseDouble(s);
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (NumberFormatException ex) {
+            log.error("Invalid numeric value: {}", value, ex);
+            throw new IllegalArgumentException("Invalid numeric value: " + value, ex);
+        }
     }
 
     private List<String> parseList(Object value) {
@@ -127,6 +136,7 @@ public class FraudEvaluator {
                 return objectMapper.readValue(s, new TypeReference<>() {
                 });
             } catch (Exception ex) {
+                log.warn("Failed to parse JSON list, falling back to split: {}", s, ex);
                 s = s.substring(1, s.length() - 1);
             }
         }
@@ -145,20 +155,35 @@ public class FraudEvaluator {
         String normalized = normalizeField(fieldName);
 
         try {
-            Field f = TransactionDto.class.getDeclaredField(normalized);
-            f.setAccessible(true);
-            return f.get(transaction);
-        } catch (NoSuchFieldException e) {
-            try {
-                PropertyDescriptor pd = new PropertyDescriptor(normalized, TransactionDto.class);
-                Method getter = pd.getReadMethod();
-                if (getter != null) return getter.invoke(transaction);
-            } catch (Exception ex) {
-                return null;
+            Field f = FIELD_CACHE.computeIfAbsent(normalized, n -> {
+                try {
+                    Field field = TransactionDto.class.getDeclaredField(n);
+                    field.setAccessible(true);
+                    return field;
+                } catch (NoSuchFieldException e) {
+                    return null;
+                }
+            });
+            if (f != null) {
+                return f.get(transaction);
+            }
+
+            Method getter = GETTER_CACHE.computeIfAbsent(normalized, n -> {
+                try {
+                    PropertyDescriptor pd = new PropertyDescriptor(n, TransactionDto.class);
+                    return pd.getReadMethod();
+                } catch (Exception ex) {
+                    return null;
+                }
+            });
+            if (getter != null) {
+                return getter.invoke(transaction);
             }
         } catch (Exception e) {
+            log.error("Failed to access field {} on TransactionDto", normalized, e);
             return null;
         }
+        log.warn("No such field/getter found for {}", normalized);
         return null;
     }
 

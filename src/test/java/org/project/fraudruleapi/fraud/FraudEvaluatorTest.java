@@ -14,18 +14,29 @@ import org.project.fraudruleapi.shared.enums.TransactionType;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 
 class FraudEvaluatorTest {
 
     private FraudEvaluator fraudEvaluator;
     private ObjectMapper objectMapper;
+    private TransactionDto transactionDto;
 
     @BeforeEach
     void setUp() {
         fraudEvaluator = new FraudEvaluator();
         objectMapper = new ObjectMapper();
+
+        transactionDto = TransactionDto.builder()
+                .transactionId("TX123")
+                .transactionType(TransactionType.TRANSFER)
+                .transferAmount(1000.0)
+                .beneficiaryAccount(346546456L)
+                .accountId(76575675L)
+                .currency("USD")
+                .build();
+
     }
 
     @Test
@@ -176,5 +187,74 @@ class FraudEvaluatorTest {
         Condition notCond = new Condition(ConditionalType.NOT, null, null, List.of(cond2));
         boolean notResult = fraudEvaluator.evaluateCondition(notCond, tx);
         assertThat(notResult).isFalse();
+    }
+
+
+    @Test
+    void testEqualsOperator_StringMatch() {
+        Condition cond = new Condition(ConditionalType.EQUAL, "transactionType", "TRANSFER", null);
+        assertTrue(fraudEvaluator.evaluateCondition(cond, transactionDto));
+    }
+
+    @Test
+    void testEqualsOperator_NumberMatch() {
+        Condition cond = new Condition(ConditionalType.EQUAL, "transferAmount", 1000.0, null);
+        assertTrue(fraudEvaluator.evaluateCondition(cond, transactionDto));
+    }
+
+    @Test
+    void testGreaterThan() {
+        Condition cond = new Condition(ConditionalType.GREATER_THAN, "transferAmount", 500, null);
+        assertTrue(fraudEvaluator.evaluateCondition(cond, transactionDto));
+    }
+
+    @Test
+    void testLessThanOrEqual() {
+        Condition cond = new Condition(ConditionalType.LESS_THAN_OR_EQUAL, "transferAmount", 1000.0, null);
+        assertTrue(fraudEvaluator.evaluateCondition(cond, transactionDto));
+    }
+
+    @Test
+    void testIncludeOperator() {
+        Condition cond = new Condition(ConditionalType.INCLUDE, "currency", List.of("USD", "ZAR"), null);
+        assertTrue(fraudEvaluator.evaluateCondition(cond, transactionDto));
+    }
+
+    @Test
+    void testAndOperator() {
+        Condition cond1 = new Condition(ConditionalType.EQUAL, "transactionType", "TRANSFER", null);
+        Condition cond2 = new Condition(ConditionalType.GREATER_THAN, "transferAmount", 500, null);
+        Condition and = new Condition(ConditionalType.AND, null, null, List.of(cond1, cond2));
+
+        assertTrue(fraudEvaluator.evaluateCondition(and, transactionDto));
+    }
+
+    @Test
+    void testOrOperator() {
+        Condition cond1 = new Condition(ConditionalType.EQUAL, "transactionType", "DEPOSIT", null);
+        Condition cond2 = new Condition(ConditionalType.EQUAL, "currency", "USD", null);
+        Condition or = new Condition(ConditionalType.OR, null, null, List.of(cond1, cond2));
+
+        assertTrue(fraudEvaluator.evaluateCondition(or, transactionDto));
+    }
+
+    @Test
+    void testNotOperator() {
+        Condition cond = new Condition(ConditionalType.NOT, null, null,
+                List.of(new Condition(ConditionalType.EQUAL, "currency", "ZAR", null)));
+
+        assertTrue(fraudEvaluator.evaluateCondition(cond, transactionDto));
+    }
+
+    @Test
+    void testInvalidNumericThrows() {
+        Condition cond = new Condition(ConditionalType.GREATER_THAN, "transactionType", "ABC", null);
+        assertThrows(IllegalArgumentException.class, () -> fraudEvaluator.evaluateCondition(cond, transactionDto));
+    }
+
+    @Test
+    void testMissingFieldReturnsNull() {
+        Condition cond = new Condition(ConditionalType.EQUAL, "nonexistentField", "value", null);
+        assertFalse(fraudEvaluator.evaluateCondition(cond, transactionDto));
     }
 }
