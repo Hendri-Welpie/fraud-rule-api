@@ -78,13 +78,14 @@ services:
     depends_on:
       - redis
 
-#  fraud-rule-api:
-#    build: .
-#    depends_on:
-#      - postgres
-#      - redis
-#    networks:
-#      - dbnet
+  fraud-rule-api:
+    image: hendricoetsee/fraud-rule-api:latest
+    build: .
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - dbnet
 
 volumes:
   pgdata:

@@ -54,7 +54,7 @@ public interface FraudApi {
                             schema = @Schema(implementation = ErrorResponse.class)
                     ))
     })
-    Mono<ResponseEntity<Page<FraudEntity>>> getFlaggedItems(@NotBlank final int page, @NotBlank final int size);
+    Mono<ResponseEntity<Page<FraudEntity>>> getFlaggedItems(final Integer page, final Integer size);
 
     @Operation(summary = "getFlaggedItem", description = "Get fraud item")
     @ApiResponses(value = {

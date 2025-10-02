@@ -27,8 +27,8 @@ public class FraudController implements FraudApi {
 
     @GetMapping("/flag-items")
     public Mono<ResponseEntity<Page<FraudEntity>>> getFlaggedItems(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "0") Integer page,
+            @RequestParam(defaultValue = "10") Integer size) {
         return this.fraudService.getFlaggedItems(page, size)
                 .map(ResponseEntity::ok);
     }
