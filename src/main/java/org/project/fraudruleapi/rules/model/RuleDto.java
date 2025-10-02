@@ -19,5 +19,4 @@ public class RuleDto implements Serializable {
     private Boolean active;
     private Instant createAt;
     private Instant updateAt;
-
 }

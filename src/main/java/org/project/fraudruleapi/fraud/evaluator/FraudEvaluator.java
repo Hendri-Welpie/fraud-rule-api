@@ -10,6 +10,7 @@ import org.project.fraudruleapi.fraud.model.TransactionDto;
 import org.project.fraudruleapi.rules.model.RuleDto;
 import org.project.fraudruleapi.shared.enums.ConditionalType;
 import org.project.fraudruleapi.shared.exception.ConvertionException;
+import org.springframework.stereotype.Component;
 
 import java.beans.PropertyDescriptor;
 import java.io.IOException;
@@ -21,15 +22,13 @@ import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 
 @Slf4j
+@Component
 public class FraudEvaluator {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
-
-    // Cache reflection results
     private static final Map<String, Field> FIELD_CACHE = new ConcurrentHashMap<>();
     private static final Map<String, Method> GETTER_CACHE = new ConcurrentHashMap<>();
 
-    // Operator strategy map
     private final Map<ConditionalType, BiPredicate<Condition, TransactionDto>> evaluators =
             Map.ofEntries(
                     Map.entry(ConditionalType.EQUAL, this::equalsOp),
@@ -72,8 +71,6 @@ public class FraudEvaluator {
         };
     }
 
-    // ===== Operator implementations =====
-
     private boolean equalsOp(Condition cond, TransactionDto tx) {
         Object fieldVal = getFieldValue(tx, cond.field());
         Object condVal = cond.value();
@@ -109,8 +106,6 @@ public class FraudEvaluator {
         Double cv = parseToDouble(cond.value());
         return Double.compare(fv, cv);
     }
-
-    // ===== Helper methods =====
 
     private Double parseToDouble(Object value) {
         if (value == null) {

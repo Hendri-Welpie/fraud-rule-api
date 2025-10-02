@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 public interface TransactionMapper {
     TransactionMapper INSTANCE = Mappers.getMapper(TransactionMapper.class);
 
+    @Mapping(target = "id", ignore = true)
     @Mapping(source = "timeStamp", target = "timeStamp", qualifiedByName = "convertToInstant")
     TransactionEntity mapToEntity(TransactionDto transaction);
 

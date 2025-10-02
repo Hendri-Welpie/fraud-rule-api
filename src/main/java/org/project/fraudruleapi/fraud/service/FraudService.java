@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import org.project.fraudruleapi.fraud.entity.FraudEntity;
 import org.project.fraudruleapi.fraud.evaluator.FraudEvaluator;
 import org.project.fraudruleapi.fraud.mapper.TransactionMapper;
-import org.project.fraudruleapi.fraud.model.PageResponse;
 import org.project.fraudruleapi.fraud.model.TransactionDto;
 import org.project.fraudruleapi.fraud.repository.FraudRepository;
 import org.project.fraudruleapi.fraud.repository.TransactionRepository;

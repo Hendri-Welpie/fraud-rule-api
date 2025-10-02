@@ -15,7 +15,7 @@ import java.net.URI;
 @RestController
 @RequestMapping("/v1/api/fraud")
 @RequiredArgsConstructor
-public class FraudController {
+public class FraudController implements FraudApi {
     private final FraudService fraudService;
 
     @PostMapping(path = "/transactions", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)

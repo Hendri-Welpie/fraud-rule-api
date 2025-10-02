@@ -9,7 +9,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.project.fraudruleapi.fraud.entity.FraudEntity;
-import org.project.fraudruleapi.fraud.model.PageResponse;
 import org.project.fraudruleapi.fraud.model.TransactionDto;
 import org.project.fraudruleapi.rules.model.ErrorResponse;
 import org.springframework.data.domain.Page;
@@ -54,7 +53,7 @@ public interface FraudApi {
                             schema = @Schema(implementation = ErrorResponse.class)
                     ))
     })
-    Mono<ResponseEntity<PageResponse<FraudEntity>>> getFlaggedItems(@NotBlank final int page, @NotBlank final int size);
+    Mono<ResponseEntity<Page<FraudEntity>>> getFlaggedItems(@NotBlank final int page, @NotBlank final int size);
 
     @Operation(summary = "getFlaggedItem", description = "Get fraud item")
     @ApiResponses(value = {
