@@ -55,7 +55,7 @@ jobs:
           context: .
           push: true
           tags: |
-            docker.io/${{ secrets.DOCKER_USERNAME }}/your-app:${{ env.VERSION }}
-            docker.io/${{ secrets.DOCKER_USERNAME }}/your-app:latest
-            ghcr.io/hendri-welpie/your-app:${{ env.VERSION }}
-            ghcr.io/hendri-welpie/your-app:latest
+            docker.io/${{ secrets.DOCKER_USERNAME }}/fraud-rule-api:${{ env.VERSION }}
+            docker.io/${{ secrets.DOCKER_USERNAME }}/fraud-rule-api:latest
+            ghcr.io/hendri-welpie/fraud-rule-api:${{ env.VERSION }}
+            ghcr.io/hendri-welpie/fraud-rule-api:latest
