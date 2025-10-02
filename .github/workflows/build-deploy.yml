@@ -57,5 +57,5 @@ jobs:
           tags: |
             docker.io/${{ secrets.DOCKER_USERNAME }}/your-app:${{ env.VERSION }}
             docker.io/${{ secrets.DOCKER_USERNAME }}/your-app:latest
-            ghcr.io/${{ github.repository_owner.toLowerCase() }}/your-app:${{ env.VERSION }}
-            ghcr.io/${{ github.repository_owner.toLowerCase() }}/your-app:latest
+            ghcr.io/hendri-welpie/your-app:${{ env.VERSION }}
+            ghcr.io/hendri-welpie/your-app:latest
