@@ -79,9 +79,8 @@ services:
       - redis
 
   fraud-rule-api:
-    container_name: fraud-rule-api
+    container_name: fraud
     image: hendricoetsee/fraud-rule-api:latest
-    build: .
     depends_on:
       - postgres
       - redis

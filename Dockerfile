@@ -16,7 +16,7 @@ USER springboot
 
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=80.0 -XX:InitialRAMPercentage=80.0"
 
-EXPOSE 8080
+EXPOSE 9080
 
 COPY --from=build /app/target/*.jar app.jar
 ENTRYPOINT ["java", "-jar", "/app.jar"]
