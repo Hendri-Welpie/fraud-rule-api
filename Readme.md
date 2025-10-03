@@ -73,7 +73,7 @@ X-Trace-Id: <your-unique-trace-id>
 This endpoint validates a transaction, stores it, and flags it if suspicious.
 
 ```bash
-curl --location 'http://fraud-rule-api:9080/v1/api/fraud/transactions' \
+curl --location 'http://localhost:9080/v1/api/fraud/transactions' \
 --header 'X-Trace-Id: 4c5e36a1-089b-4c7b-8517-b2fcbac941db' \
 --header 'Content-Type: application/json' \
 --data '{
@@ -102,7 +102,7 @@ curl --location 'http://fraud-rule-api:9080/v1/api/fraud/transactions' \
 Retrieve all transactions currently flagged as fraud:
 
 ```bash
-curl --location 'http://fraud-rule-api:9080/v1/api/fraud/flag-items' \
+curl --location 'http://localhost:9080/v1/api/fraud/flag-items' \
 --header 'X-Trace-Id: 27a1c44f-9fa7-4eb0-a921-0a736a01fcc9'
 ```
 
@@ -113,7 +113,7 @@ curl --location 'http://fraud-rule-api:9080/v1/api/fraud/flag-items' \
 Search for a flagged item by ID:
 
 ```bash
-curl --location 'http://fraud-rule-api:9080/v1/api/fraud/flag-item/5' \
+curl --location 'http://localhost:9080/v1/api/fraud/flag-item/5' \
 --header 'X-Trace-Id: 97766d29-001f-4d2e-9e33-02c1d12cb532'
 ```
 
