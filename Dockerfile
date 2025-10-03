@@ -1,4 +1,5 @@
-FROM eclipse-temurin:25-jdk-jammy AS build
+# Build stage
+FROM --platform=$BUILDPLATFORM eclipse-temurin:25-jdk-jammy AS build
 
 WORKDIR /app
 COPY mvnw .
@@ -9,13 +10,16 @@ RUN ./mvnw dependency:go-offline -B
 COPY src src
 RUN ./mvnw package -DskipTests
 
-FROM eclipse-temurin:25-jre-jammy
+# Runtime stage
+FROM --platform=$TARGETPLATFORM eclipse-temurin:25-jre-jammy
 
 RUN groupadd --system springboot && useradd --system --gid springboot springboot
 USER springboot
 
+# Memory tuning
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=80.0 -XX:InitialRAMPercentage=80.0"
 
+# Expose Spring Boot port (default 8080, change if overridden in application.yml)
 EXPOSE 9080
 
 COPY --from=build /app/target/*.jar app.jar

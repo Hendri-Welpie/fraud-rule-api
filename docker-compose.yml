@@ -81,6 +81,11 @@ services:
   fraud-rule-api:
     container_name: fraud
     image: hendricoetsee/fraud-rule-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9080:8080"   # Map host 9080 → container 8080
     depends_on:
       - postgres
       - redis
