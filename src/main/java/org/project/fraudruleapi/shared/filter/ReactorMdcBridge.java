@@ -16,7 +16,7 @@ public class ReactorMdcBridge {
 
     @PostConstruct
     public void setup() {
-        Hooks.onEachOperator("MDC", Operators.lift((sc, sub) -> new MDCContextLifter<>(sub)));
+        Hooks.onEachOperator("MDC", Operators.lift((scannable, coreSubscriber) -> new MDCContextLifter<>(coreSubscriber)));
         log.info("Reactor → MDC bridge installed");
     }
 
@@ -28,20 +28,20 @@ public class ReactorMdcBridge {
         }
 
         @Override
-        public void onSubscribe(Subscription s) {
-            delegate.onSubscribe(s);
+        public void onSubscribe(Subscription subscription) {
+            delegate.onSubscribe(subscription);
         }
 
         @Override
-        public void onNext(T t) {
+        public void onNext(T value) {
             copyToMdc(delegate.currentContext());
-            delegate.onNext(t);
+            delegate.onNext(value);
         }
 
         @Override
-        public void onError(Throwable t) {
+        public void onError(Throwable throwable) {
             copyToMdc(delegate.currentContext());
-            delegate.onError(t);
+            delegate.onError(throwable);
         }
 
         @Override
@@ -55,9 +55,9 @@ public class ReactorMdcBridge {
             return delegate.currentContext();
         }
 
-        private void copyToMdc(Context ctx) {
-            if (ctx.hasKey("traceId")) {
-                MDC.put("traceId", ctx.get("traceId"));
+        private void copyToMdc(Context context) {
+            if (context.hasKey("traceId")) {
+                MDC.put("traceId", context.get("traceId"));
             } else {
                 MDC.remove("traceId");
             }

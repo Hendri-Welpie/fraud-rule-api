@@ -13,7 +13,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s  # <--- Add this
+      start_period: 30s
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
@@ -44,7 +44,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: admin@admin.com
       PGADMIN_DEFAULT_PASSWORD: password
       PGADMIN_CONFIG_UPGRADE_CHECK_ENABLED: 'False'
-      PGADMIN_LISTEN_ADDRESS: 0.0.0.0  # <--- Recommended for stability
+      PGADMIN_LISTEN_ADDRESS: 0.0.0.0
     ports:
       - "8050:80"
     restart: always
@@ -85,7 +85,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "9080:9080"   # Map host 9080 → container 8080
+      - "9080:9080"
     depends_on:
       - postgres
       - redis

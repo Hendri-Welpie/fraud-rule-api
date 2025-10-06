@@ -24,7 +24,6 @@ public class FraudController implements FraudApi {
                 .then(Mono.fromCallable(() -> ResponseEntity.created(URI.create("/rules")).build()));
     }
 
-
     @GetMapping("/flag-items")
     public Mono<ResponseEntity<Page<FraudEntity>>> getFlaggedItems(
             @RequestParam(defaultValue = "0") Integer page,

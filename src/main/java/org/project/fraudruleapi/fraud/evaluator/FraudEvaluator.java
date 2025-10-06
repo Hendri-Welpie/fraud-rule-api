@@ -33,10 +33,10 @@ public class FraudEvaluator {
             Map.ofEntries(
                     Map.entry(ConditionalType.EQUAL, this::equalsOp),
                     Map.entry(ConditionalType.EQUALS, this::equalsOp),
-                    Map.entry(ConditionalType.GREATER_THAN, (c, t) -> compareNumeric(c, t) > 0),
-                    Map.entry(ConditionalType.GREAT_THAN_OR_EQUAL, (c, t) -> compareNumeric(c, t) >= 0),
-                    Map.entry(ConditionalType.LESS_THAN, (c, t) -> compareNumeric(c, t) < 0),
-                    Map.entry(ConditionalType.LESS_THAN_OR_EQUAL, (c, t) -> compareNumeric(c, t) <= 0),
+                    Map.entry(ConditionalType.GREATER_THAN, (condition, transactionDto) -> compareNumeric(condition, transactionDto) > 0),
+                    Map.entry(ConditionalType.GREAT_THAN_OR_EQUAL, (condition, transactionDto) -> compareNumeric(condition, transactionDto) >= 0),
+                    Map.entry(ConditionalType.LESS_THAN, (condition, transactionDto) -> compareNumeric(condition, transactionDto) < 0),
+                    Map.entry(ConditionalType.LESS_THAN_OR_EQUAL, (condition, transactionDto) -> compareNumeric(condition, transactionDto) <= 0),
                     Map.entry(ConditionalType.INCLUDE, this::includeOp)
             );
 
@@ -54,57 +54,57 @@ public class FraudEvaluator {
         }
     }
 
-    public boolean evaluateCondition(Condition cond, TransactionDto tx) {
+    public boolean evaluateCondition(Condition cond, TransactionDto transactionDto) {
         return switch (cond.type()) {
-            case AND -> cond.operands().stream().allMatch(op -> evaluateCondition(op, tx));
-            case OR -> cond.operands().stream().anyMatch(op -> evaluateCondition(op, tx));
+            case AND -> cond.operands().stream().allMatch(op -> evaluateCondition(op, transactionDto));
+            case OR -> cond.operands().stream().anyMatch(op -> evaluateCondition(op, transactionDto));
             case NOT -> cond.operands() != null && !cond.operands().isEmpty()
-                    && !evaluateCondition(cond.operands().getFirst(), tx);
+                    && !evaluateCondition(cond.operands().getFirst(), transactionDto);
             default -> {
                 BiPredicate<Condition, TransactionDto> evaluator = evaluators.get(cond.type());
                 if (evaluator == null) {
                     log.error("Unsupported condition type: {}", cond.type());
                     throw new IllegalArgumentException("Unsupported condition type: " + cond.type());
                 }
-                yield evaluator.test(cond, tx);
+                yield evaluator.test(cond, transactionDto);
             }
         };
     }
 
-    private boolean equalsOp(Condition cond, TransactionDto tx) {
-        Object fieldVal = getFieldValue(tx, cond.field());
+    private boolean equalsOp(Condition cond, TransactionDto transactionDto) {
+        Object fieldVal = getFieldValue(transactionDto, cond.field());
         Object condVal = cond.value();
 
         if (fieldVal == null && condVal == null) return true;
         if (fieldVal == null) return false;
 
         if (fieldVal instanceof Number) {
-            Double fv = ((Number) fieldVal).doubleValue();
-            Double cv = parseToDouble(condVal);
-            return Objects.equals(fv, cv);
+            Double fieldValue = ((Number) fieldVal).doubleValue();
+            Double conditionValue = parseToDouble(condVal);
+            return Objects.equals(fieldValue, conditionValue);
         } else {
             return String.valueOf(fieldVal).equalsIgnoreCase(String.valueOf(condVal));
         }
     }
 
-    private boolean includeOp(Condition cond, TransactionDto tx) {
-        Object fieldVal = getFieldValue(tx, cond.field());
+    private boolean includeOp(Condition cond, TransactionDto transactionDto) {
+        Object fieldVal = getFieldValue(transactionDto, cond.field());
         if (fieldVal == null) return false;
 
         List<String> candidates = parseList(cond.value());
-        String fv = String.valueOf(fieldVal);
-        return candidates.contains(fv) || candidates.contains(removeQuotes(fv));
+        String fieldValue = String.valueOf(fieldVal);
+        return candidates.contains(fieldValue) || candidates.contains(removeQuotes(fieldValue));
     }
 
-    private int compareNumeric(Condition cond, TransactionDto tx) {
-        Object fieldVal = getFieldValue(tx, cond.field());
+    private int compareNumeric(Condition cond, TransactionDto transactionDto) {
+        Object fieldVal = getFieldValue(transactionDto, cond.field());
         if (fieldVal == null) {
             throw new IllegalArgumentException("Field " + cond.field() + " is null, cannot compare numerically");
         }
 
-        double fv = parseToDouble(fieldVal);
-        Double cv = parseToDouble(cond.value());
-        return Double.compare(fv, cv);
+        double fieldValue = parseToDouble(fieldVal);
+        Double conditionValue = parseToDouble(cond.value());
+        return Double.compare(fieldValue, conditionValue);
     }
 
     private Double parseToDouble(Object value) {
@@ -125,24 +125,24 @@ public class FraudEvaluator {
         if (value instanceof List) {
             return ((List<?>) value).stream().map(Object::toString).collect(Collectors.toList());
         }
-        String s = value.toString().trim();
-        if (s.startsWith("[") && s.endsWith("]")) {
+        String trimmedValue = value.toString().trim();
+        if (trimmedValue.startsWith("[") && trimmedValue.endsWith("]")) {
             try {
-                return objectMapper.readValue(s, new TypeReference<>() {
+                return objectMapper.readValue(trimmedValue, new TypeReference<>() {
                 });
             } catch (Exception ex) {
-                log.warn("Failed to parse JSON list, falling back to split: {}", s, ex);
-                s = s.substring(1, s.length() - 1);
+                log.warn("Failed to parse JSON list, falling back to split: {}", trimmedValue, ex);
+                trimmedValue = trimmedValue.substring(1, trimmedValue.length() - 1);
             }
         }
-        return Arrays.stream(s.split(","))
+        return Arrays.stream(trimmedValue.split(","))
                 .map(String::trim)
                 .map(this::removeQuotes)
                 .collect(Collectors.toList());
     }
 
-    private String removeQuotes(String s) {
-        return s.replaceAll("^\"|\"$", "");
+    private String removeQuotes(String trimmedValue) {
+        return trimmedValue.replaceAll("^\"|\"$", "");
     }
 
     private Object getFieldValue(TransactionDto transaction, String fieldName) {
@@ -150,7 +150,7 @@ public class FraudEvaluator {
         String normalized = normalizeField(fieldName);
 
         try {
-            Field f = FIELD_CACHE.computeIfAbsent(normalized, n -> {
+            Field fieldValue = FIELD_CACHE.computeIfAbsent(normalized, n -> {
                 try {
                     Field field = TransactionDto.class.getDeclaredField(n);
                     field.setAccessible(true);
@@ -159,14 +159,14 @@ public class FraudEvaluator {
                     return null;
                 }
             });
-            if (f != null) {
-                return f.get(transaction);
+            if (fieldValue != null) {
+                return fieldValue.get(transaction);
             }
 
             Method getter = GETTER_CACHE.computeIfAbsent(normalized, n -> {
                 try {
-                    PropertyDescriptor pd = new PropertyDescriptor(n, TransactionDto.class);
-                    return pd.getReadMethod();
+                    PropertyDescriptor propertyDescriptor = new PropertyDescriptor(n, TransactionDto.class);
+                    return propertyDescriptor.getReadMethod();
                 } catch (Exception ex) {
                     return null;
                 }
@@ -197,10 +197,10 @@ public class FraudEvaluator {
     private String snakeToCamel(String value) {
         if (!value.contains("_")) return value;
         String[] parts = value.split("_");
-        StringBuilder sb = new StringBuilder(parts[0]);
+        StringBuilder stringBuilder = new StringBuilder(parts[0]);
         for (int i = 1; i < parts.length; i++) {
-            sb.append(Character.toUpperCase(parts[i].charAt(0))).append(parts[i].substring(1));
+            stringBuilder.append(Character.toUpperCase(parts[i].charAt(0))).append(parts[i].substring(1));
         }
-        return sb.toString();
+        return stringBuilder.toString();
     }
 }
