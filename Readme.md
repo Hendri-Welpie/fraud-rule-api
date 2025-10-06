@@ -34,6 +34,7 @@ The following services will be started:
 - **Postgres** (frauddb) – stores transactions & flagged frauds
 - **Redis** – caching for fast rule lookups
 - **PGAdmin** – database GUI for PostgreSQL
+- **Fraud-Rule-API** - service to flag transactions
 
 ---
 
