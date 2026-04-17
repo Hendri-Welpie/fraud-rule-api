@@ -98,42 +98,41 @@ services:
     profiles:
       - dev
 
-#  fraud-rule-api:
-#    container_name: fraud-rule-api
-#    image: hendricoetsee/fraud-rule-api:latest
-#    build:
-#      context: .
-#      dockerfile: Dockerfile
-#    ports:
-#      - "9080:9080"
-#    environment:
-#      - SPRING_PROFILES_ACTIVE=default
-#      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/frauddb
-#      - SPRING_DATA_REDIS_HOST=redis
-#      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC
-#    depends_on:
-#      postgres:
-#        condition: service_healthy
-#      redis:
-#        condition: service_healthy
-#    healthcheck:
-#      test: ["CMD", "curl", "-f", "http://localhost:9080/actuator/health"]
-#      interval: 30s
-#      timeout: 10s
-#      retries: 3
-#      start_period: 90s
-#    networks:
-#      - dbnet
-#    deploy:
-#      replicas: 3
-#      resources:
-#        limits:
-#          memory: 1G
-#          cpus: '1.0'
-#      restart_policy:
-#        condition: on-failure
-#        delay: 5s
-#        max_attempts: 3
+  fraud-rule-api:
+    image: hendricoetsee/fraud-rule-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9080:9080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=default
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/frauddb
+      - SPRING_DATA_REDIS_HOST=redis
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    networks:
+      - dbnet
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
 
 volumes:
   pgdata:
