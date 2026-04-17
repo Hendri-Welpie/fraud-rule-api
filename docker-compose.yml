@@ -107,7 +107,12 @@ services:
       - "9080:9080"
     environment:
       - SPRING_PROFILES_ACTIVE=default
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/frauddb
+      - SPRING_DATASOURCE_URL=r2dbc:postgresql://postgres:5432/frauddb
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_FLYWAY_URL=jdbc:postgresql://postgres:5432/frauddb
+      - SPRING_FLYWAY_USER=postgres
+      - SPRING_FLYWAY_PASSWORD=postgres
       - SPRING_DATA_REDIS_HOST=redis
       - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC
     depends_on:
