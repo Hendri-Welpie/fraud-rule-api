@@ -1,33 +1,125 @@
 server:
   port: 9080
+  shutdown: graceful
 
 app:
   schedule:
-    updateRules: "0/59 * * * * *"
+    updateRules: "0 0/5 * * * *"
+  fraud:
+    evaluation:
+      parallel-threshold: 5
+      timeout-ms: 5000
+      max-concurrent-evaluations: 100
+    velocity:
+      enabled: true
+      window-seconds: 60
+      max-transactions: 10
+    risk:
+      high-threshold: 80
+      medium-threshold: 50
+      low-threshold: 20
+    amount:
+      high-value-threshold: 1000000.00
+      suspicious-threshold: 500000.00
 
 spring:
   application:
-    name: Fraud Rule Api
+    name: fraud-rule-api
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   cache:
     type: redis
+    redis:
+      time-to-live: 300000
+      cache-null-values: false
   data:
     redis:
       host: redis
       port: 6379
-  datasource:
-    driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://postgres:5432/frauddb
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+          max-wait: 2000ms
+  r2dbc:
+    url: r2dbc:postgresql://postgres:5432/frauddb
     username: postgres
     password: postgres
-    hikari:
-      schema: fraud
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    schemas: fraud
+
+# Reactive scheduler configuration
+reactor:
+  schedulers:
+    defaultBoundedElasticSize: 100
+    defaultBoundedElasticQueueSize: 10000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
+  health:
+    redis:
+      enabled: true
+    db:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+
+# OpenTelemetry configuration
+otel:
+  service:
+    name: ${spring.application.name}
+  traces:
+    exporter: otlp
+  metrics:
+    exporter: prometheus
+
+# Resilience4j configuration
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 100
+        minimumNumberOfCalls: 10
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+        recordExceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - java.util.concurrent.TimeoutException
+          - java.io.IOException
+    instances:
+      fraudService:
+        baseConfig: default
+  ratelimiter:
+    configs:
+      default:
+        registerHealthIndicator: true
+        timeoutDuration: 0
+        limitRefreshPeriod: 1s
+        limitForPeriod: 100000
+    instances:
+      fraudApi:
+        baseConfig: default
 
 logging:
   level:
     root: info
-    org:
-      flywaydb: DEBUG
+    org.flywaydb: DEBUG
+    org.project.fraudruleapi: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"

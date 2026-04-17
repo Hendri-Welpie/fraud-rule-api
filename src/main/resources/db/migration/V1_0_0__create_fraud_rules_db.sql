@@ -211,4 +211,3 @@ INSERT INTO fraud.fraud_events (
       (3, 1001, 'Beneficiary account is blacklisted', 'MERCHANT_BLACKLIST', 'HIGH', NOW() - INTERVAL '1 minute', 'TXN100003', NOW() - INTERVAL '1 minute'),
       (2, 1003, 'Amount exceeded threshold', 'AMOUNT_THRESHOLD', 'LOW', NOW() - INTERVAL '15 minutes', 'TXN100004', NOW() - INTERVAL '14 minutes'),
       (3, 1001, 'Beneficiary account is blacklisted', 'MERCHANT_BLACKLIST', 'HIGH', NOW(), 'TXN100005', NOW());
-

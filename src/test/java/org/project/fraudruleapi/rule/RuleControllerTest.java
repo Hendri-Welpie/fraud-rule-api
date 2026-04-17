@@ -53,12 +53,12 @@ class RuleControllerTest {
 
     @Test
     void create_shouldReturnCreatedResponse() {
-        when(ruleService.createRule(any(JsonNode.class))).thenReturn(Mono.empty());
+        when(ruleService.createRule(any(JsonNode.class))).thenReturn(Mono.just("new-rule"));
 
         StepVerifier.create(ruleController.create(mockJson))
                 .assertNext(response -> {
                     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-                    assertThat(Objects.requireNonNull(response.getHeaders().getLocation()).toString()).isEqualTo("/rules");
+                    assertThat(Objects.requireNonNull(response.getHeaders().getLocation()).toString()).isEqualTo("/api/v1/rules/new-rule");
                 })
                 .verifyComplete();
 
@@ -113,5 +113,19 @@ class RuleControllerTest {
                 .verifyComplete();
 
         verify(ruleService, times(1)).deleteRule("rule1");
+    }
+
+    @Test
+    void getActiveRule_shouldReturnActiveRule() {
+        when(ruleService.findActiveRule()).thenReturn(Mono.just(ruleDto1));
+
+        StepVerifier.create(ruleController.getActiveRule())
+                .assertNext(response -> {
+                    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+                    assertThat(response.getBody()).isEqualTo(ruleDto1);
+                })
+                .verifyComplete();
+
+        verify(ruleService, times(1)).findActiveRule();
     }
 }

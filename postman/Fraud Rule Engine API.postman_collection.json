@@ -1,0 +1,551 @@
+{
+  "info": {
+    "name": "Fraud Rule Engine API",
+    "description": "Comprehensive API collection for Fraud Rule Engine with all possible scenarios",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:9080",
+      "type": "string"
+    },
+    {
+      "key": "trace_id",
+      "value": "test-trace-123",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Fraud API",
+      "item": [
+        {
+          "name": "Validate Transaction",
+          "item": [
+            {
+              "name": "Normal Transaction (No Fraud)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 500.00,\n  \"timestamp\": \"2026-04-14T10:30:00Z\",\n  \"transaction_type\": \"DEPOSIT\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"192.168.1.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "High Value Transaction (Fraud)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-002\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 1500000.00,\n  \"timestamp\": \"2026-04-14T10:31:00Z\",\n  \"transaction_type\": \"TRANSFER\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"192.168.1.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Velocity Limit Exceeded (Fraud)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-003\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 100.00,\n  \"timestamp\": \"2026-04-14T10:32:00Z\",\n  \"transaction_type\": \"TRANSFER\",\n  \"channel\": \"MOBILE_APP\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"192.168.1.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Multiple Rules Triggered (Fraud)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-004\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"USD\",\n  \"amount\": 2000000.00,\n  \"timestamp\": \"2026-04-14T10:33:00Z\",\n  \"transaction_type\": \"TRANSFER\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"192.168.1.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Invalid Request (Error)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"\",\n  \"account_id\": -1,\n  \"amount\": -100.00,\n  \"timestamp\": \"invalid-date\",\n  \"status\": \"INVALID\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Get Flagged Items",
+          "item": [
+            {
+              "name": "Get All Flagged Items (Paginated)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/flag-items?page=0&size=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "flag-items"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "10"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Specific Flagged Item",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/flag-item/1",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "flag-item", "1"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Get Fraud by Account",
+          "item": [
+            {
+              "name": "Get Fraud Items for Account",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/account/123456",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "account", "123456"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Get Fraud by Severity",
+          "item": [
+            {
+              "name": "Get High Severity Frauds",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/severity/HIGH?page=0&size=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "severity", "HIGH"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "10"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Medium Severity Frauds",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/severity/MEDIUM?page=0&size=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "severity", "MEDIUM"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "10"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Low Severity Frauds",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/severity/LOW?page=0&size=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "severity", "LOW"],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "10"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rules API",
+      "item": [
+        {
+          "name": "Create Rule",
+          "item": [
+            {
+              "name": "Simple Rule (Amount > 1000)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ruleId\": \"high-amount-rule\",\n  \"name\": \"High Amount Rule\",\n  \"description\": \"Flag transactions with amount > 1000\",\n  \"condition\": {\n    \"type\": \"GREATER_THAN\",\n    \"field\": \"amount\",\n    \"value\": 1000\n  },\n  \"actions\": [\n    {\n      \"type\": \"FLAG\",\n      \"severity\": \"MEDIUM\"\n    }\n  ],\n  \"enabled\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rules",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rules"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Complex Rule (AND condition)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ruleId\": \"complex-rule\",\n  \"name\": \"Complex Rule\",\n  \"description\": \"High amount AND suspicious currency\",\n  \"condition\": {\n    \"type\": \"AND\",\n    \"operands\": [\n      {\n        \"type\": \"GREATER_THAN\",\n        \"field\": \"amount\",\n        \"value\": 50000\n      },\n      {\n        \"type\": \"EQUAL\",\n        \"field\": \"currency\",\n        \"value\": \"USD\"\n      }\n    ]\n  },\n  \"actions\": [\n    {\n      \"type\": \"FLAG\",\n      \"severity\": \"HIGH\"\n    }\n  ],\n  \"enabled\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rules",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rules"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Velocity Rule",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ruleId\": \"velocity-rule\",\n  \"name\": \"Velocity Rule\",\n  \"description\": \"Too many transactions in short time\",\n  \"condition\": {\n    \"type\": \"VELOCITY_CHECK\",\n    \"field\": \"accountId\",\n    \"value\": 5,\n    \"timeWindow\": 300\n  },\n  \"actions\": [\n    {\n      \"type\": \"FLAG\",\n      \"severity\": \"HIGH\"\n    }\n  ],\n  \"enabled\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rules",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rules"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Invalid Rule (Error)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ruleId\": \"\",\n  \"name\": \"\",\n  \"condition\": {\n    \"type\": \"INVALID_TYPE\"\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rules",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rules"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Get Rules",
+          "item": [
+            {
+              "name": "Get All Rules",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rules",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rules"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Specific Rule",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rules/high-amount-rule",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rules", "high-amount-rule"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Active Rule",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rules/active",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rules", "active"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Update Rule",
+          "item": [
+            {
+              "name": "Update Existing Rule",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ruleId\": \"high-amount-rule\",\n  \"name\": \"Updated High Amount Rule\",\n  \"description\": \"Updated: Flag transactions with amount > 2000\",\n  \"condition\": {\n    \"type\": \"GREATER_THAN\",\n    \"field\": \"amount\",\n    \"value\": 2000\n  },\n  \"actions\": [\n    {\n      \"type\": \"FLAG\",\n      \"severity\": \"HIGH\"\n    }\n  ],\n  \"enabled\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rules/high-amount-rule",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rules", "high-amount-rule"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Delete Rule",
+          "item": [
+            {
+              "name": "Delete Existing Rule",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "X-Trace-Id",
+                    "value": "{{trace_id}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rules/high-amount-rule",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rules", "high-amount-rule"]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

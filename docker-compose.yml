@@ -18,6 +18,10 @@ services:
       - pgdata:/var/lib/postgresql/data
     networks:
       - dbnet
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
@@ -55,16 +59,29 @@ services:
       - pgadmin_data:/var/lib/pgadmin
     networks:
       - dbnet
+    profiles:
+      - dev
 
   redis:
-    image: redis:latest
+    image: redis:7-alpine
     container_name: redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     volumes:
       - redis_data:/data
     networks:
       - dbnet
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   redis-insight:
     image: redis/redisinsight:latest
@@ -76,21 +93,47 @@ services:
     networks:
       - dbnet
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+    profiles:
+      - dev
 
-  fraud-rule-api:
-    container_name: fraud
-    image: hendricoetsee/fraud-rule-api:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "9080:9080"
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - dbnet
+#  fraud-rule-api:
+#    container_name: fraud-rule-api
+#    image: hendricoetsee/fraud-rule-api:latest
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    ports:
+#      - "9080:9080"
+#    environment:
+#      - SPRING_PROFILES_ACTIVE=default
+#      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/frauddb
+#      - SPRING_DATA_REDIS_HOST=redis
+#      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
+#      redis:
+#        condition: service_healthy
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:9080/actuator/health"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
+#      start_period: 90s
+#    networks:
+#      - dbnet
+#    deploy:
+#      replicas: 3
+#      resources:
+#        limits:
+#          memory: 1G
+#          cpus: '1.0'
+#      restart_policy:
+#        condition: on-failure
+#        delay: 5s
+#        max_attempts: 3
 
 volumes:
   pgdata:

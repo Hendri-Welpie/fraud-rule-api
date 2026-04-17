@@ -9,7 +9,6 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 @Component
 @RequiredArgsConstructor
@@ -18,10 +17,9 @@ public class RuleCache {
 
     @Cacheable(value = "rules", key = "'active'")
     public Mono<RuleDto> getActiveRule() {
-        return Mono.fromCallable(() -> ruleRepository.findByActiveIsTrue()
-                        .orElseThrow(() -> new ResourceNotFound("No active rule found")))
-                .map(RuleMapper.INSTANCE::mapToRuleDto)
-                .subscribeOn(Schedulers.boundedElastic());
+        return ruleRepository.findByActiveIsTrue()
+                .switchIfEmpty(Mono.error(new ResourceNotFound("No active rule found")))
+                .map(RuleMapper.INSTANCE::mapToRuleDto);
     }
 
     @CacheEvict(value = "rules", allEntries = true)

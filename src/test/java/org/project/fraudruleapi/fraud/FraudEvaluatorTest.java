@@ -5,9 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.project.fraudruleapi.fraud.evaluator.FraudEvaluator;
+import org.project.fraudruleapi.fraud.evaluator.strategy.*;
 import org.project.fraudruleapi.fraud.model.Condition;
+import org.project.fraudruleapi.fraud.model.EvaluationResult;
+import org.project.fraudruleapi.fraud.model.RuleDefinition;
 import org.project.fraudruleapi.fraud.model.TransactionDto;
 import org.project.fraudruleapi.rules.model.RuleDto;
+import org.project.fraudruleapi.shared.config.ApplicationConfiguration;
 import org.project.fraudruleapi.shared.enums.ConditionalType;
 import org.project.fraudruleapi.shared.enums.TransactionType;
 
@@ -25,7 +29,32 @@ class FraudEvaluatorTest {
 
     @BeforeEach
     void setUp() {
-        fraudEvaluator = new FraudEvaluator();
+        // Create real evaluators
+        List<ConditionEvaluator> evaluators = List.of(
+                new EqualsEvaluator(),
+                new EqualEvaluator(),
+                new GreaterThanEvaluator(),
+                new GreaterThanOrEqualEvaluator(),
+                new LessThanEvaluator(),
+                new LessThanOrEqualEvaluator(),
+                new IncludeEvaluator(),
+                new NotEqualEvaluator(),
+                new NotEqualsEvaluator()
+        );
+
+        ConditionEvaluatorFactory factory = new ConditionEvaluatorFactory(evaluators);
+        factory.init();
+
+        // Create config
+        ApplicationConfiguration config = new ApplicationConfiguration();
+        ApplicationConfiguration.FraudConfiguration fraudConfig = new ApplicationConfiguration.FraudConfiguration();
+        ApplicationConfiguration.EvaluationConfig evaluationConfig = new ApplicationConfiguration.EvaluationConfig();
+        evaluationConfig.setParallelThreshold(5);
+        evaluationConfig.setTimeoutMs(5000L);
+        fraudConfig.setEvaluation(evaluationConfig);
+        config.setFraud(fraudConfig);
+
+        fraudEvaluator = new FraudEvaluator(factory, config);
         objectMapper = new ObjectMapper();
 
         transactionDto = TransactionDto.builder()
@@ -36,7 +65,6 @@ class FraudEvaluatorTest {
                 .accountId(76575675L)
                 .currency("USD")
                 .build();
-
     }
 
     @Test
@@ -109,12 +137,13 @@ class FraudEvaluatorTest {
     }
 
     @Test
-    void getRules_shouldThrowConvertionException_whenInvalidJson() {
+    void getRules_shouldReturnEmptyList_whenInvalidJson() {
         RuleDto ruleDto = RuleDto.builder()
                 .data(mock(JsonNode.class))
                 .build();
 
-        assertThrows(RuntimeException.class, () -> fraudEvaluator.getRules(ruleDto));
+        List<?> rules = fraudEvaluator.getRules(ruleDto);
+        assertThat(rules).isEmpty();
     }
 
     @Test
@@ -256,5 +285,100 @@ class FraudEvaluatorTest {
     void testMissingFieldReturnsNull() {
         Condition cond = new Condition(ConditionalType.EQUAL, "nonexistentField", "value", null);
         assertFalse(fraudEvaluator.evaluateCondition(cond, transactionDto));
+    }
+
+    @Test
+    void testParallelEvaluation() {
+        // Set threshold to 1 to trigger parallel
+        ApplicationConfiguration config = new ApplicationConfiguration();
+        ApplicationConfiguration.FraudConfiguration fraudConfig = new ApplicationConfiguration.FraudConfiguration();
+        ApplicationConfiguration.EvaluationConfig evaluationConfig = new ApplicationConfiguration.EvaluationConfig();
+        evaluationConfig.setParallelThreshold(1);
+        evaluationConfig.setTimeoutMs(1000);
+        fraudConfig.setEvaluation(evaluationConfig);
+        config.setFraud(fraudConfig);
+
+        ConditionEvaluatorFactory factory = new ConditionEvaluatorFactory(List.of(
+                new EqualsEvaluator(),
+                new EqualEvaluator(),
+                new GreaterThanEvaluator(),
+                new GreaterThanOrEqualEvaluator(),
+                new LessThanEvaluator(),
+                new LessThanOrEqualEvaluator(),
+                new IncludeEvaluator(),
+                new NotEqualEvaluator(),
+                new NotEqualsEvaluator()
+        ));
+        factory.init();
+
+        FraudEvaluator parallelEvaluator = new FraudEvaluator(factory, config);
+
+        List<RuleDefinition> rules = List.of(
+                RuleDefinition.builder()
+                        .id("rule1")
+                        .name("Rule 1")
+                        .description("Test rule 1")
+                        .condition(new Condition(ConditionalType.EQUAL, "transferAmount", 1000.0, null))
+                        .build(),
+                RuleDefinition.builder()
+                        .id("rule2")
+                        .name("Rule 2")
+                        .description("Test rule 2")
+                        .condition(new Condition(ConditionalType.EQUAL, "transferAmount", 2000.0, null))
+                        .build()
+        );
+
+        List<EvaluationResult> results = parallelEvaluator.evaluateAllRules(rules, transactionDto);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).ruleId()).isEqualTo("rule1");
+    }
+
+    @Test
+    void testAndCondition() {
+        Condition andCond = new Condition(ConditionalType.AND, null, null,
+                List.of(
+                        new Condition(ConditionalType.EQUAL, "transferAmount", 1000.0, null),
+                        new Condition(ConditionalType.EQUAL, "currency", "USD", null)
+                ));
+
+        assertTrue(fraudEvaluator.evaluateCondition(andCond, transactionDto));
+    }
+
+    @Test
+    void testOrCondition() {
+        Condition orCond = new Condition(ConditionalType.OR, null, null,
+                List.of(
+                        new Condition(ConditionalType.EQUAL, "transferAmount", 1000.0, null),
+                        new Condition(ConditionalType.EQUAL, "transferAmount", 2000.0, null)
+                ));
+
+        assertTrue(fraudEvaluator.evaluateCondition(orCond, transactionDto));
+    }
+
+    @Test
+    void testNotCondition() {
+        Condition notCond = new Condition(ConditionalType.NOT, null, null,
+                List.of(new Condition(ConditionalType.EQUAL, "transferAmount", 2000.0, null)));
+
+        assertTrue(fraudEvaluator.evaluateCondition(notCond, transactionDto));
+    }
+
+    @Test
+    void testEmptyAndCondition() {
+        Condition andCond = new Condition(ConditionalType.AND, null, null, List.of());
+        assertTrue(fraudEvaluator.evaluateCondition(andCond, transactionDto));
+    }
+
+    @Test
+    void testEmptyOrCondition() {
+        Condition orCond = new Condition(ConditionalType.OR, null, null, List.of());
+        assertFalse(fraudEvaluator.evaluateCondition(orCond, transactionDto));
+    }
+
+    @Test
+    void testEmptyNotCondition() {
+        Condition notCond = new Condition(ConditionalType.NOT, null, null, List.of());
+        assertTrue(fraudEvaluator.evaluateCondition(notCond, transactionDto));
     }
 }

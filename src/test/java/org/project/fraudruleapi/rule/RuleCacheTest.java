@@ -10,12 +10,10 @@ import org.project.fraudruleapi.rules.repository.RuleRepository;
 import org.project.fraudruleapi.rules.service.RuleService;
 import org.project.fraudruleapi.shared.cache.RuleCache;
 import org.project.fraudruleapi.shared.exception.ResourceNotFound;
+import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import java.util.Optional;
-
 import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class RuleCacheTest {
@@ -36,7 +34,7 @@ class RuleCacheTest {
                 .active(true)
                 .build();
 
-        when(ruleRepository.findByActiveIsTrue()).thenReturn(Optional.of(ruleEntity));
+        when(ruleRepository.findByActiveIsTrue()).thenReturn(Mono.just(ruleEntity));
 
         StepVerifier.create(rulesCache.getActiveRule())
                 .expectNextMatches(ruleDto -> ruleDto.getRuleId().equals("rule-123"))
@@ -47,7 +45,7 @@ class RuleCacheTest {
 
     @Test
     void getRules_shouldError_whenNotFound() {
-        when(ruleRepository.findByActiveIsTrue()).thenReturn(Optional.empty());
+        when(ruleRepository.findByActiveIsTrue()).thenReturn(Mono.empty());
 
         StepVerifier.create(rulesCache.getActiveRule())
                 .expectError(ResourceNotFound.class)

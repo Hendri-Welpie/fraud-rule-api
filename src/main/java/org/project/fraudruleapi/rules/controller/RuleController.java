@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import org.project.fraudruleapi.rules.model.RuleDto;
 import org.project.fraudruleapi.rules.service.RuleService;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -15,14 +14,13 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/rules")
-public class RuleController  implements RuleApi {
+public class RuleController implements RuleApi {
     private final RuleService ruleService;
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
     public Mono<ResponseEntity<Void>> create(@RequestBody final JsonNode ruleJson) {
         return this.ruleService.createRule(ruleJson)
-                .then(Mono.fromCallable(() -> ResponseEntity.created(URI.create("/rules")).build()));
+                .map(ruleId -> ResponseEntity.created(URI.create("/api/v1/rules/" + ruleId)).build());
     }
 
     @GetMapping("/{ruleId}")
@@ -48,5 +46,11 @@ public class RuleController  implements RuleApi {
     public Mono<ResponseEntity<Void>> delete(@PathVariable("ruleId") String ruleId) {
         return this.ruleService.deleteRule(ruleId)
                 .then(Mono.fromCallable(() -> ResponseEntity.noContent().build()));
+    }
+
+    @GetMapping("/active")
+    public Mono<ResponseEntity<RuleDto>> getActiveRule() {
+        return this.ruleService.findActiveRule()
+                .map(ResponseEntity::ok);
     }
 }

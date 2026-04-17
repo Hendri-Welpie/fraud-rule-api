@@ -15,6 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ErrorResponse {
+    @Builder.Default
     private LocalDateTime timestamp = LocalDateTime.now();
     private int status;
     private String error;

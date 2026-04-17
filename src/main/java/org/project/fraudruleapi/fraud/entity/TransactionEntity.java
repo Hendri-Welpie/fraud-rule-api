@@ -1,14 +1,15 @@
 package org.project.fraudruleapi.fraud.entity;
 
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.Instant;
 
-@Entity
 @Getter
 @Setter
 @AllArgsConstructor
@@ -16,36 +17,35 @@ import java.time.Instant;
 @Table(schema = "fraud", name = "transaction")
 public class TransactionEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(name = "transaction_id")
+    @Column("transaction_id")
     private String transactionId;
-    @Column(name = "account_id")
+    @Column("account_id")
     private Long accountId;
-    @Column(name = "user_id")
+    @Column("user_id")
     private Long userId;
-    @Column(name = "currency")
+    @Column("currency")
     private String currency;
-    @Column(name = "amount")
+    @Column("amount")
     private Double transferAmount;
-    @Column(name = "timestamp")
+    @Column("timestamp")
     private Instant timeStamp;
-    @Column(name = "transaction_type")
+    @Column("transaction_type")
     private String transactionType;
-    @Column(name = "channel")
+    @Column("channel")
     private String channel;
-    @Column(name = "merchant_id")
+    @Column("merchant_id")
     private String merchantId;
-    @Column(name = "merchant_name")
+    @Column("merchant_name")
     private String merchantName;
-    @Column(name = "beneficiary_account")
+    @Column("beneficiary_account")
     private Long beneficiaryAccount;
-    @Column(name = "ip_address")
+    @Column("ip_address")
     private String ipAddress;
-    @Column(name = "device_id")
+    @Column("device_id")
     private String deviceId;
-    @Column(name = "location")
+    @Column("location")
     private String location;
-    @Column(name = "status")
+    @Column("status")
     private String status;
 }

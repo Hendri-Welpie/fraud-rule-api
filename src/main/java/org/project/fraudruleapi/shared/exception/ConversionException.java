@@ -1,0 +1,7 @@
+package org.project.fraudruleapi.shared.exception;
+
+public class ConversionException extends RuntimeException {
+    public ConversionException(String message) {
+        super(message);
+    }
+}

@@ -1,33 +1,108 @@
 server:
   port: 9080
+  shutdown: graceful
 
 app:
   schedule:
-    updateRules: "0/59 * * * * *"
+    updateRules: "0 0/5 * * * *"
+  fraud:
+    evaluation:
+      parallel-threshold: 5
+      timeout-ms: 5000
+      max-concurrent-evaluations: 100
+    velocity:
+      enabled: true
+      window-seconds: 60
+      max-transactions: 10
+    risk:
+      high-threshold: 80
+      medium-threshold: 50
+      low-threshold: 20
+    amount:
+      high-value-threshold: 1000000.00
+      suspicious-threshold: 500000.00
 
 spring:
   application:
-    name: Fraud Rule Api
+    name: fraud-rule-api
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  cache:
+    type: redis
+    redis:
+      time-to-live: 300000
+      cache-null-values: false
   data:
     redis:
       host: localhost
       port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+          max-wait: 2000ms
   datasource:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://localhost:5433/frauddb
     username: postgres
     password: postgres
     hikari:
-      schema: fraud
+      schema: public
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      pool-name: FraudRuleHikariPool
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      leak-detection-threshold: 60000
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5433/frauddb
+    username: postgres
+    password: postgres
   flyway:
+    url: jdbc:postgresql://localhost:5433/frauddb
+    username: postgres
+    password: postgres
     enabled: true
     locations: classpath:db/migration
     schemas: fraud
+    baseline-on-migrate: true
+    validate-on-migrate: false
+
+# Reactive scheduler configuration
+reactor:
+  schedulers:
+    defaultBoundedElasticSize: 100
+    defaultBoundedElasticQueueSize: 10000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
+  health:
+    redis:
+      enabled: true
+    db:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
 
 logging:
-#  pattern:
-#    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   level:
     root: info
-    org:
-      flywaydb: DEBUG
+    org.flywaydb: DEBUG
+    org.project.fraudruleapi: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"

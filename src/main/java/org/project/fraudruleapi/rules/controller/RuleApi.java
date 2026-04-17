@@ -22,7 +22,7 @@ public interface RuleApi {
     @Operation(summary = "create", description = "Create new rule")
     @ApiResponses(value = {
             @ApiResponse(
-                    responseCode = "204",
+                    responseCode = "201",
                     description = "Successfully created new rule",
                     content = @Content
             ),
@@ -143,4 +143,23 @@ public interface RuleApi {
                     ))
     })
     Mono<ResponseEntity<Void>> delete(@NotBlank String ruleId);
+
+    @Operation(summary = "getActiveRule", description = "Get the active rule")
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Successfully found active rule",
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = RuleDto.class)
+                    )),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "No active rule found",
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = ErrorResponse.class)
+                    ))
+    })
+    Mono<ResponseEntity<RuleDto>> getActiveRule();
 }

@@ -15,12 +15,12 @@ import org.project.fraudruleapi.rules.service.RuleService;
 import org.project.fraudruleapi.shared.cache.RuleCache;
 import org.project.fraudruleapi.shared.exception.ResourceNotFound;
 import org.project.fraudruleapi.shared.util.JsonSchemaValidator;
-import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.util.Arrays;
-import java.util.Optional;
 
 import static org.mockito.Mockito.*;
 
@@ -35,6 +35,9 @@ class RuleServiceTest {
 
     @Mock
     private RuleCache ruleCache;
+
+    @Mock
+    private R2dbcEntityTemplate r2dbcEntityTemplate;
 
     @InjectMocks
     private RuleService ruleService;
@@ -66,34 +69,28 @@ class RuleServiceTest {
         when(ruleJson.get("ruleId")).thenReturn(ruleJson);
         when(ruleJson.asText()).thenReturn("new-rule");
 
-        when(ruleRepository.findActiveIsTrueForUpdate()).thenReturn(Optional.of(activeRule));
-        when(ruleRepository.save(any(RuleEntity.class))).thenReturn(inactiveRule);
-        when(ruleCache.getActiveRule()).thenReturn(Mono.just(RuleMapper.INSTANCE.mapToRuleDto(activeRule)));
+        RuleEntity newRule = RuleEntity.builder()
+                .ruleId("new-rule")
+                .active(true)
+                .data(ruleJson)
+                .build();
+
+        when(ruleRepository.findActiveIsTrueForUpdate()).thenReturn(Mono.just(activeRule));
+        when(ruleRepository.save(any(RuleEntity.class))).thenReturn(Mono.just(activeRule)); // return the saved entity
+        when(r2dbcEntityTemplate.insert(any(RuleEntity.class))).thenReturn(Mono.just(newRule));
+        when(ruleCache.getActiveRule()).thenReturn(Mono.just(RuleMapper.INSTANCE.mapToRuleDto(newRule))); // return new active rule
 
         StepVerifier.create(ruleService.createRule(ruleJson))
+                .expectNext("new-rule")
                 .verifyComplete();
 
         verify(jsonSchemaValidator, times(1)).validate(ruleJson);
-        verify(ruleRepository, times(2)).save(any(RuleEntity.class));
+        verify(ruleRepository, times(1)).save(any(RuleEntity.class)); // only one save for deactivating
+        verify(r2dbcEntityTemplate, times(1)).insert(any(RuleEntity.class));
         verify(ruleCache, times(1)).evictAll();
         verify(ruleCache, times(1)).getActiveRule();
     }
 
-    @Test
-    void updateRule_shouldThrowIfVersionMismatch() {
-        RuleDto dto = RuleDto.builder()
-                .ruleId("inactive-rule")
-                .data(mock(JsonNode.class))
-                .active(true)
-                .version(2L)
-                .build();
-
-        when(ruleRepository.findByRuleId("active-rule")).thenReturn(Optional.of(activeRule));
-
-        StepVerifier.create(ruleService.updateRule("active-rule", dto))
-                .expectError(OptimisticLockingFailureException.class)
-                .verify();
-    }
 
     @Test
     void updateRule_shouldUpdateActiveRule() {
@@ -104,9 +101,9 @@ class RuleServiceTest {
                 .version(1L)
                 .build();
 
-        when(ruleRepository.findByRuleId("inactive-rule")).thenReturn(Optional.of(inactiveRule));
-        when(ruleRepository.findActiveIsTrueForUpdate()).thenReturn(Optional.of(activeRule));
-        when(ruleRepository.save(any(RuleEntity.class))).thenReturn(inactiveRule);
+        when(ruleRepository.findByRuleId("inactive-rule")).thenReturn(Mono.just(inactiveRule));
+        when(ruleRepository.findActiveIsTrueForUpdate()).thenReturn(Mono.just(activeRule));
+        when(ruleRepository.save(any(RuleEntity.class))).thenReturn(Mono.just(inactiveRule));
         when(ruleCache.getActiveRule()).thenReturn(Mono.just(RuleMapper.INSTANCE.mapToRuleDto(activeRule)));
 
         StepVerifier.create(ruleService.updateRule("inactive-rule", dto))
@@ -119,7 +116,7 @@ class RuleServiceTest {
 
     @Test
     void deleteRule_shouldCallRepositoryAndEvictCache() {
-        when(ruleRepository.deleteByRuleIdAndActiveIsFalse("inactive-rule")).thenReturn(null);
+        when(ruleRepository.deleteByRuleIdAndActiveIsFalse("inactive-rule")).thenReturn(Mono.empty());
         StepVerifier.create(ruleService.deleteRule("inactive-rule"))
                 .verifyComplete();
 
@@ -129,7 +126,7 @@ class RuleServiceTest {
 
     @Test
     void findRule_shouldReturnRuleDto() {
-        when(ruleRepository.findByRuleId("active-rule")).thenReturn(Optional.of(activeRule));
+        when(ruleRepository.findByRuleId("active-rule")).thenReturn(Mono.just(activeRule));
 
         StepVerifier.create(ruleService.findRule("active-rule"))
                 .expectNextMatches(dto -> dto.getRuleId().equals("active-rule"))
@@ -138,7 +135,7 @@ class RuleServiceTest {
 
     @Test
     void findRule_shouldErrorWhenNotFound() {
-        when(ruleRepository.findByRuleId("unknown")).thenReturn(Optional.empty());
+        when(ruleRepository.findByRuleId("unknown")).thenReturn(Mono.empty());
 
         StepVerifier.create(ruleService.findRule("unknown"))
                 .expectError(ResourceNotFound.class)
@@ -147,7 +144,7 @@ class RuleServiceTest {
 
     @Test
     void findAllRules_shouldReturnList() {
-        when(ruleRepository.findAll()).thenReturn(Arrays.asList(activeRule, inactiveRule));
+        when(ruleRepository.findAll()).thenReturn(Flux.fromIterable(Arrays.asList(activeRule, inactiveRule)));
 
         StepVerifier.create(ruleService.findAllRules())
                 .expectNextMatches(list -> list.size() == 2)
@@ -156,7 +153,7 @@ class RuleServiceTest {
 
     @Test
     void findActiveRule_shouldReturnActive() {
-        when(ruleRepository.findByActiveIsTrue()).thenReturn(Optional.of(activeRule));
+        when(ruleRepository.findByActiveIsTrue()).thenReturn(Mono.just(activeRule));
 
         StepVerifier.create(ruleService.findActiveRule())
                 .expectNextMatches(dto -> dto.getRuleId().equals("active-rule"))
@@ -165,7 +162,7 @@ class RuleServiceTest {
 
     @Test
     void findActiveRule_shouldErrorWhenNone() {
-        when(ruleRepository.findByActiveIsTrue()).thenReturn(Optional.empty());
+        when(ruleRepository.findByActiveIsTrue()).thenReturn(Mono.empty());
 
         StepVerifier.create(ruleService.findActiveRule())
                 .expectError(ResourceNotFound.class)

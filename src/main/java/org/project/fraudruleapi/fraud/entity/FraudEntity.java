@@ -1,11 +1,12 @@
 package org.project.fraudruleapi.fraud.entity;
 
-import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.Instant;
 
-@Entity
 @Getter
 @Setter
 @Builder
@@ -14,31 +15,30 @@ import java.time.Instant;
 @Table(schema = "fraud", name = "fraud_events")
 public class FraudEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
+    @Column("id")
     private Long id;
 
-    @Column(name = "transaction_id")
+    @Column("transaction_id")
     private String transactionId;
 
-    @Column(name = "account_id")
+    @Column("account_id")
     private long accountId;
 
-    @Column(name = "transaction_date")
+    @Column("transaction_date")
     private Instant transactionDate;
 
-    @Column(name = "rule_id")
+    @Column("rule_id")
     private String ruleId;
 
-    @Column(name = "type")
+    @Column("type")
     private String type;
 
-    @Column(name = "reason")
+    @Column("reason")
     private String reason;
 
-    @Column(name = "severity")
+    @Column("severity")
     private String severity;
 
-    @Column(name = "detected_at")
+    @Column("detected_at")
     private Instant detectedAt;
 }

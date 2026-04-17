@@ -3,204 +3,179 @@ package org.project.fraudruleapi.fraud.evaluator;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.project.fraudruleapi.fraud.evaluator.strategy.ConditionEvaluator;
+import org.project.fraudruleapi.fraud.evaluator.strategy.ConditionEvaluatorFactory;
 import org.project.fraudruleapi.fraud.model.Condition;
+import org.project.fraudruleapi.fraud.model.EvaluationResult;
 import org.project.fraudruleapi.fraud.model.RuleDefinition;
 import org.project.fraudruleapi.fraud.model.TransactionDto;
 import org.project.fraudruleapi.rules.model.RuleDto;
-import org.project.fraudruleapi.shared.enums.ConditionalType;
-import org.project.fraudruleapi.shared.exception.ConvertionException;
+import org.project.fraudruleapi.shared.config.ApplicationConfiguration;
+import org.project.fraudruleapi.shared.exception.ConversionException;
 import org.springframework.stereotype.Component;
 
-import java.beans.PropertyDescriptor;
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiPredicate;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class FraudEvaluator {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static final Map<String, Field> FIELD_CACHE = new ConcurrentHashMap<>();
-    private static final Map<String, Method> GETTER_CACHE = new ConcurrentHashMap<>();
 
-    private final Map<ConditionalType, BiPredicate<Condition, TransactionDto>> evaluators =
-            Map.ofEntries(
-                    Map.entry(ConditionalType.EQUAL, this::equalsOp),
-                    Map.entry(ConditionalType.EQUALS, this::equalsOp),
-                    Map.entry(ConditionalType.GREATER_THAN, (condition, transactionDto) -> compareNumeric(condition, transactionDto) > 0),
-                    Map.entry(ConditionalType.GREAT_THAN_OR_EQUAL, (condition, transactionDto) -> compareNumeric(condition, transactionDto) >= 0),
-                    Map.entry(ConditionalType.LESS_THAN, (condition, transactionDto) -> compareNumeric(condition, transactionDto) < 0),
-                    Map.entry(ConditionalType.LESS_THAN_OR_EQUAL, (condition, transactionDto) -> compareNumeric(condition, transactionDto) <= 0),
-                    Map.entry(ConditionalType.INCLUDE, this::includeOp)
-            );
+    private final ConditionEvaluatorFactory evaluatorFactory;
+    private final ApplicationConfiguration config;
+
+    private final ExecutorService virtualExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     public List<RuleDefinition> getRules(final RuleDto ruleDto) {
         try {
             JsonNode rulesNode = ruleDto.getData().get("rules");
-            return objectMapper.readValue(
-                    rulesNode.traverse(),
-                    new TypeReference<>() {
-                    }
-            );
+            if (rulesNode == null || rulesNode.isNull()) {
+                log.warn("No rules found in RuleDto");
+                return List.of();
+            }
+            return objectMapper.readValue(rulesNode.traverse(), new TypeReference<>() {});
         } catch (IOException e) {
             log.error("Failed to parse rules from RuleDto", e);
-            throw new ConvertionException("Unable to convert rules");
+            throw new ConversionException("Unable to convert rules");
         }
+    }
+
+    public List<EvaluationResult> evaluateAllRules(List<RuleDefinition> rules, TransactionDto transaction) {
+        int parallelThreshold = config.getFraud().getEvaluation().getParallelThreshold();
+        long timeoutMs = config.getFraud().getEvaluation().getTimeoutMs();
+
+        if (rules.size() >= parallelThreshold) {
+            return evaluateParallel(rules, transaction, timeoutMs);
+        }
+        return evaluateSequential(rules, transaction);
+    }
+
+    private List<EvaluationResult> evaluateSequential(List<RuleDefinition> rules, TransactionDto transaction) {
+        Instant start = Instant.now();
+        List<EvaluationResult> results = rules.stream()
+                .filter(rule -> evaluateCondition(rule.condition(), transaction))
+                .map(rule -> EvaluationResult.builder()
+                        .ruleId(rule.id())
+                        .ruleName(rule.name())
+                        .description(rule.description())
+                        .matched(true)
+                        .evaluationTimeMs(Duration.between(start, Instant.now()).toMillis())
+                        .build())
+                .collect(Collectors.toList());
+
+        log.debug("Sequential evaluation of {} rules completed in {}ms, {} matched",
+                rules.size(), Duration.between(start, Instant.now()).toMillis(), results.size());
+        return results;
+    }
+
+    private List<EvaluationResult> evaluateParallel(List<RuleDefinition> rules,
+                                                     TransactionDto transaction,
+                                                     long timeoutMs) {
+        Instant start = Instant.now();
+
+        List<CompletableFuture<EvaluationResult>> futures = rules.stream()
+                .map(rule -> CompletableFuture.supplyAsync(() -> {
+                    Instant ruleStart = Instant.now();
+                    boolean matched = evaluateCondition(rule.condition(), transaction);
+                    return EvaluationResult.builder()
+                            .ruleId(rule.id())
+                            .ruleName(rule.name())
+                            .description(rule.description())
+                            .matched(matched)
+                            .evaluationTimeMs(Duration.between(ruleStart, Instant.now()).toMillis())
+                            .build();
+                }, virtualExecutor))
+                .toList();
+
+        try {
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                    .get(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            log.warn("Parallel evaluation timed out or failed, some results may be incomplete", e);
+        }
+
+        List<EvaluationResult> results = futures.stream()
+                .filter(f -> f.isDone() && !f.isCompletedExceptionally())
+                .map(CompletableFuture::join)
+                .filter(EvaluationResult::matched)
+                .collect(Collectors.toList());
+
+        log.debug("Parallel evaluation of {} rules completed in {}ms, {} matched",
+                rules.size(), Duration.between(start, Instant.now()).toMillis(), results.size());
+        return results;
     }
 
     public boolean evaluateCondition(Condition cond, TransactionDto transactionDto) {
+        if (cond == null) {
+            log.warn("Null condition received, returning false");
+            return false;
+        }
+
         return switch (cond.type()) {
-            case AND -> cond.operands().stream().allMatch(op -> evaluateCondition(op, transactionDto));
-            case OR -> cond.operands().stream().anyMatch(op -> evaluateCondition(op, transactionDto));
-            case NOT -> cond.operands() != null && !cond.operands().isEmpty()
-                    && !evaluateCondition(cond.operands().getFirst(), transactionDto);
-            default -> {
-                BiPredicate<Condition, TransactionDto> evaluator = evaluators.get(cond.type());
-                if (evaluator == null) {
-                    log.error("Unsupported condition type: {}", cond.type());
-                    throw new IllegalArgumentException("Unsupported condition type: " + cond.type());
-                }
-                yield evaluator.test(cond, transactionDto);
-            }
+            case AND -> evaluateAnd(cond, transactionDto);
+            case OR -> evaluateOr(cond, transactionDto);
+            case NOT -> evaluateNot(cond, transactionDto);
+            default -> evaluateSimpleCondition(cond, transactionDto);
         };
     }
 
-    private boolean equalsOp(Condition cond, TransactionDto transactionDto) {
-        Object fieldVal = getFieldValue(transactionDto, cond.field());
-        Object condVal = cond.value();
-
-        if (fieldVal == null && condVal == null) return true;
-        if (fieldVal == null) return false;
-
-        if (fieldVal instanceof Number) {
-            Double fieldValue = ((Number) fieldVal).doubleValue();
-            Double conditionValue = parseToDouble(condVal);
-            return Objects.equals(fieldValue, conditionValue);
-        } else {
-            return String.valueOf(fieldVal).equalsIgnoreCase(String.valueOf(condVal));
+    private boolean evaluateAnd(Condition cond, TransactionDto transactionDto) {
+        if (cond.operands() == null || cond.operands().isEmpty()) {
+            return true; // Empty AND is true
         }
+        return cond.operands().stream()
+                .allMatch(op -> evaluateCondition(op, transactionDto));
     }
 
-    private boolean includeOp(Condition cond, TransactionDto transactionDto) {
-        Object fieldVal = getFieldValue(transactionDto, cond.field());
-        if (fieldVal == null) return false;
-
-        List<String> candidates = parseList(cond.value());
-        String fieldValue = String.valueOf(fieldVal);
-        return candidates.contains(fieldValue) || candidates.contains(removeQuotes(fieldValue));
+    private boolean evaluateOr(Condition cond, TransactionDto transactionDto) {
+        if (cond.operands() == null || cond.operands().isEmpty()) {
+            return false; // Empty OR is false
+        }
+        return cond.operands().stream()
+                .anyMatch(op -> evaluateCondition(op, transactionDto));
     }
 
-    private int compareNumeric(Condition cond, TransactionDto transactionDto) {
-        Object fieldVal = getFieldValue(transactionDto, cond.field());
-        if (fieldVal == null) {
-            throw new IllegalArgumentException("Field " + cond.field() + " is null, cannot compare numerically");
+    private boolean evaluateNot(Condition cond, TransactionDto transactionDto) {
+        if (cond.operands() == null || cond.operands().isEmpty()) {
+            return true; // NOT of empty is true
         }
-
-        double fieldValue = parseToDouble(fieldVal);
-        Double conditionValue = parseToDouble(cond.value());
-        return Double.compare(fieldValue, conditionValue);
+        return !evaluateCondition(cond.operands().getFirst(), transactionDto);
     }
 
-    private Double parseToDouble(Object value) {
-        if (value == null) {
-            throw new IllegalArgumentException("Cannot parse null to double");
-        }
-        if (value instanceof Number) return ((Number) value).doubleValue();
-        try {
-            return Double.parseDouble(value.toString());
-        } catch (NumberFormatException ex) {
-            log.error("Invalid numeric value: {}", value, ex);
-            throw new IllegalArgumentException("Invalid numeric value: " + value, ex);
-        }
+    private boolean evaluateSimpleCondition(Condition cond, TransactionDto transactionDto) {
+        ConditionEvaluator evaluator = evaluatorFactory.getEvaluatorOrThrow(cond.type());
+        return evaluator.evaluate(cond, transactionDto);
     }
 
-    private List<String> parseList(Object value) {
-        if (value == null) return Collections.emptyList();
-        if (value instanceof List) {
-            return ((List<?>) value).stream().map(Object::toString).collect(Collectors.toList());
+    public int calculateRiskScore(List<EvaluationResult> matchedRules) {
+        if (matchedRules == null || matchedRules.isEmpty()) {
+            return 0;
         }
-        String trimmedValue = value.toString().trim();
-        if (trimmedValue.startsWith("[") && trimmedValue.endsWith("]")) {
-            try {
-                return objectMapper.readValue(trimmedValue, new TypeReference<>() {
-                });
-            } catch (Exception ex) {
-                log.warn("Failed to parse JSON list, falling back to split: {}", trimmedValue, ex);
-                trimmedValue = trimmedValue.substring(1, trimmedValue.length() - 1);
-            }
-        }
-        return Arrays.stream(trimmedValue.split(","))
-                .map(String::trim)
-                .map(this::removeQuotes)
-                .collect(Collectors.toList());
+        return Math.min(matchedRules.size() * 25, 100);
     }
 
-    private String removeQuotes(String trimmedValue) {
-        return trimmedValue.replaceAll("^\"|\"$", "");
-    }
-
-    private Object getFieldValue(TransactionDto transaction, String fieldName) {
-        if (fieldName == null) return null;
-        String normalized = normalizeField(fieldName);
-
-        try {
-            Field fieldValue = FIELD_CACHE.computeIfAbsent(normalized, n -> {
-                try {
-                    Field field = TransactionDto.class.getDeclaredField(n);
-                    field.setAccessible(true);
-                    return field;
-                } catch (NoSuchFieldException e) {
-                    return null;
-                }
-            });
-            if (fieldValue != null) {
-                return fieldValue.get(transaction);
-            }
-
-            Method getter = GETTER_CACHE.computeIfAbsent(normalized, n -> {
-                try {
-                    PropertyDescriptor propertyDescriptor = new PropertyDescriptor(n, TransactionDto.class);
-                    return propertyDescriptor.getReadMethod();
-                } catch (Exception ex) {
-                    return null;
-                }
-            });
-            if (getter != null) {
-                return getter.invoke(transaction);
-            }
-        } catch (Exception e) {
-            log.error("Failed to access field {} on TransactionDto", normalized, e);
-            return null;
+    public String determineSeverity(int riskScore) {
+        var riskConfig = config.getFraud().getRisk();
+        if (riskScore >= riskConfig.getHighThreshold()) {
+            return "CRITICAL";
+        } else if (riskScore >= riskConfig.getMediumThreshold()) {
+            return "HIGH";
+        } else if (riskScore >= riskConfig.getLowThreshold()) {
+            return "MEDIUM";
         }
-        log.warn("No such field/getter found for {}", normalized);
-        return null;
-    }
-
-    private String normalizeField(String fieldName) {
-        return switch (fieldName) {
-            case "transferType", "transactionType", "transaction_type" -> "transactionType";
-            case "transferAmount", "amount" -> "transferAmount";
-            case "beneficiary_account", "beneficiaryAccount" -> "beneficiaryAccount";
-            case "accountId", "account" -> "accountId";
-            case "currency" -> "currency";
-            case "transactionId", "transaction" -> "transactionId";
-            default -> snakeToCamel(fieldName);
-        };
-    }
-
-    private String snakeToCamel(String value) {
-        if (!value.contains("_")) return value;
-        String[] parts = value.split("_");
-        StringBuilder stringBuilder = new StringBuilder(parts[0]);
-        for (int i = 1; i < parts.length; i++) {
-            stringBuilder.append(Character.toUpperCase(parts[i].charAt(0))).append(parts[i].substring(1));
-        }
-        return stringBuilder.toString();
+        return "LOW";
     }
 }
+

@@ -27,6 +27,6 @@ public class TraceFilter implements WebFilter {
 
         return chain.filter(exchange)
                 .contextWrite(Context.of(TRACE_ID, traceId))
-                .doFinally(_ -> MDC.remove(TRACE_ID));
+                .doFinally(signalType -> MDC.remove(TRACE_ID));
     }
 }

@@ -1,42 +1,41 @@
 package org.project.fraudruleapi.rules.entity;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import jakarta.persistence.*;
 import lombok.*;
-import org.project.fraudruleapi.shared.converter.JsonNodeConverter;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.Instant;
 
 @Getter
 @Setter
 @Builder
-@Entity
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "fraud_rules")
+@Table(name = "fraud_rules", schema = "fraud")
 public class RuleEntity {
 
     @Id
-    @Column(name = "rule_id", unique = true, nullable = false)
+    @Column("rule_id")
     private String ruleId;
 
-    @Column(columnDefinition = "jsonb")
-    @Convert(converter = JsonNodeConverter.class)
+    @Column("data")
     private JsonNode data;
 
-    @Version
+    @Column("version")
     private Long version;
 
-    @Column(nullable = false)
+    @Column("active")
     private Boolean active;
 
     @CreatedDate
-    @Column(name = "create_at")
+    @Column("create_at")
     private Instant createAt;
 
     @LastModifiedDate
-    @Column(name = "update_at")
+    @Column("update_at")
     private Instant updateAt;
 }
