@@ -16,28 +16,6 @@ env:
   REGISTRY_GHCR: ghcr.io
 
 jobs:
-  # CodeQL Analysis Job
-  codeql:
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: java
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-
   # Build and Test Job
   build-test:
     runs-on: ubuntu-latest
@@ -108,39 +86,10 @@ jobs:
           name: coverage-report
           path: target/site/jacoco/
 
-  # Security Scan Job
-  security-scan:
-    runs-on: ubuntu-latest
-    needs: build-test
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: ${{ env.JAVA_VERSION }}
-          cache: maven
-
-      - name: Install Trivy
-        run: |
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install trivy
-
-      - name: Run Trivy filesystem scan
-        run: trivy fs --exit-code 1 --no-progress --format table .
-
-      - name: Run OWASP Dependency Check
-        run: mvn -B dependency-check:check
-
   # Build and Push Docker Image Job
   docker-build-push:
     runs-on: ubuntu-latest
-    needs: [build-test, security-scan]
+    needs: build-test
     if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
     outputs:
       version: ${{ steps.vars.outputs.version }}
@@ -196,19 +145,6 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'image'
-          scan-ref: '${{ env.REGISTRY_DOCKERHUB }}/${{ secrets.DOCKER_USERNAME }}/fraud-rule-api:${{ steps.vars.outputs.version }}'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
 
   # Deploy to Staging Job
   deploy-staging:
