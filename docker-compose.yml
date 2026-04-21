@@ -99,6 +99,7 @@ services:
       - dev
 
   fraud-rule-api:
+    image: hendricoetsee/fraud-rule-api:latest
     build:
       context: .
       dockerfile: Dockerfile
