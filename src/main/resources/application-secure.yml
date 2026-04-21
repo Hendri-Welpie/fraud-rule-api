@@ -1,0 +1,14 @@
+# Security profile - activate with: --spring.profiles.active=local,secure or SPRING_PROFILES_ACTIVE=default,secure
+# Enables RBAC-based HTTP Basic authentication
+
+app:
+  security:
+    enabled: true
+    users:
+      - username: ${FRAUD_ADMIN_USERNAME:admin}
+        password: ${FRAUD_ADMIN_PASSWORD:admin}
+        role: ADMIN
+      - username: ${FRAUD_ANALYST_USERNAME:analyst}
+        password: ${FRAUD_ANALYST_PASSWORD:changeme}
+        role: ANALYST
+

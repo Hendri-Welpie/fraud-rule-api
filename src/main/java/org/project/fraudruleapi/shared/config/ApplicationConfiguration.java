@@ -44,6 +44,15 @@ public class ApplicationConfiguration {
 
         @NotNull
         private AmountConfig amount;
+
+        @NotNull
+        private CrossBorderConfig crossBorder = new CrossBorderConfig();
+
+        @NotNull
+        private SelfTransferConfig selfTransfer = new SelfTransferConfig();
+
+        @NotNull
+        private OffHoursConfig offHours = new OffHoursConfig();
     }
 
     @Getter
@@ -92,5 +101,34 @@ public class ApplicationConfiguration {
 
         @NotNull
         private BigDecimal suspiciousThreshold = new BigDecimal("500000.00");
+    }
+
+    @Getter
+    @Setter
+    public static class CrossBorderConfig {
+        private boolean enabled = true;
+        private String domesticCurrency = "ZAR";
+        @Min(0)
+        private int weight = 15;
+    }
+
+    @Getter
+    @Setter
+    public static class SelfTransferConfig {
+        private boolean enabled = true;
+        @Min(0)
+        private int weight = 20;
+    }
+
+    @Getter
+    @Setter
+    public static class OffHoursConfig {
+        private boolean enabled = true;
+        @Min(0)
+        private int businessStartHour = 6;
+        @Min(0)
+        private int businessEndHour = 22;
+        @Min(0)
+        private int weight = 15;
     }
 }

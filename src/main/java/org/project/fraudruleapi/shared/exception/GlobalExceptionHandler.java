@@ -2,7 +2,7 @@ package org.project.fraudruleapi.shared.exception;
 
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
-import org.project.fraudruleapi.rules.model.ErrorResponse;
+import org.project.fraudruleapi.shared.model.ErrorResponse;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -85,8 +85,8 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ErrorResponse> buildErrorResponse(HttpStatus status,
-                                                              String message,
-                                                              List<String> errors) {
+                                                             String message,
+                                                             List<String> errors) {
         return new ResponseEntity<>(ErrorResponse.builder()
                 .status(status.value())
                 .error(status.getReasonPhrase())

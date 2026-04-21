@@ -13,6 +13,9 @@ A production-grade Spring Boot microservice that processes categorized transacti
 - 📈 **Observability** - Metrics, health checks, and distributed tracing support
 - 🐳 **Container Ready** - Docker and Docker Compose support
 - 🔧 **Fault Tolerance** - Circuit breaker and rate limiter for resilience
+- 🔐 **Toggleable Security** - Spring Security with HTTP Basic auth, can be enabled/disabled via config
+- 📝 **Audit Trail** - Database-backed audit logging of all API operations
+- 🔒 **PII Masking** - Automatic masking of sensitive data (account IDs, IPs, device IDs) in logs
 - 📊 **Custom Metrics** - Prometheus metrics for transaction processing and fraud detection
 - ☸️ **Kubernetes Ready** - Health probes and horizontal scaling support
 - 🔍 **Distributed Tracing** - OpenTelemetry integration for end-to-end observability
@@ -21,20 +24,21 @@ A production-grade Spring Boot microservice that processes categorized transacti
 
 ## 📦 Tech Stack
 
-| Technology | Purpose |
-|------------|---------|
-| **Java 21** | Runtime with virtual threads for high concurrency |
-| **Spring Boot 3.5** | Application framework with WebFlux |
-| **Spring WebFlux** | Reactive web framework for non-blocking I/O |
-| **PostgreSQL 16** | Primary data store with JSONB support |
-| **Redis 7** | Caching and velocity tracking |
-| **Flyway** | Database migrations |
-| **MapStruct** | Object mapping |
-| **OpenTelemetry** | Distributed tracing and observability |
-| **Resilience4j** | Circuit breaker and rate limiter for fault tolerance |
-| **Micrometer** | Metrics collection for Prometheus |
-| **Docker** | Containerization and orchestration |
-| **Maven** | Build and dependency management |
+| Technology          | Purpose                                              |
+|---------------------|------------------------------------------------------|
+| **Java 21**         | Runtime with virtual threads for high concurrency    |
+| **Spring Boot 3.5** | Application framework with WebFlux                   |
+| **Spring WebFlux**  | Reactive web framework for non-blocking I/O          |
+| **PostgreSQL 16**   | Primary data store with JSONB support                |
+| **Redis 7**         | Caching and velocity tracking                        |
+| **Flyway**          | Database migrations                                  |
+| **MapStruct**       | Object mapping                                       |
+| **OpenTelemetry**   | Distributed tracing and observability                |
+| **Resilience4j**    | Circuit breaker and rate limiter for fault tolerance |
+| **Spring Security** | Toggleable HTTP Basic authentication                 |
+| **Micrometer**      | Metrics collection for Prometheus                    |
+| **Docker**          | Containerization and orchestration                   |
+| **Maven**           | Build and dependency management                      |
 
 ---
 
@@ -161,22 +165,125 @@ otel:
 
 The application exposes the following custom Prometheus metrics:
 
-| Metric | Description | Type |
-|--------|-------------|------|
-| `fraud_transaction_processed_total` | Total number of transactions processed | Counter |
-| `fraud_detection_total` | Total number of fraud detections | Counter |
-| `fraud_velocity_check_total` | Total number of velocity checks performed | Counter |
-| `fraud_evaluation_duration` | Time taken to evaluate fraud rules | Timer |
-| `resilience4j_circuitbreaker_state` | Circuit breaker state (0=closed, 1=open, 2=half-open) | Gauge |
-| `resilience4j_ratelimiter_available_permissions` | Available rate limiter permissions | Gauge |
+| Metric                                           | Description                                           | Type    |
+|--------------------------------------------------|-------------------------------------------------------|---------|
+| `fraud_transaction_processed_total`              | Total number of transactions processed                | Counter |
+| `fraud_detection_total`                          | Total number of fraud detections                      | Counter |
+| `fraud_velocity_check_total`                     | Total number of velocity checks performed             | Counter |
+| `fraud_evaluation_duration`                      | Time taken to evaluate fraud rules                    | Timer   |
+| `resilience4j_circuitbreaker_state`              | Circuit breaker state (0=closed, 1=open, 2=half-open) | Gauge   |
+| `resilience4j_ratelimiter_available_permissions` | Available rate limiter permissions                    | Gauge   |
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SPRING_PROFILES_ACTIVE` | Active Spring profile | `default` |
-| `SPRING_DATASOURCE_URL` | PostgreSQL connection URL | `jdbc:postgresql://postgres:5432/frauddb` |
-| `SPRING_DATA_REDIS_HOST` | Redis hostname | `redis` |
+| Variable                 | Description                      | Default                                   |
+|--------------------------|----------------------------------|-------------------------------------------|
+| `SPRING_PROFILES_ACTIVE` | Active Spring profile            | `default`                                 |
+| `SPRING_DATASOURCE_URL`  | PostgreSQL connection URL        | `jdbc:postgresql://postgres:5432/frauddb` |
+| `SPRING_DATA_REDIS_HOST` | Redis hostname                   | `redis`                                   |
+| `APP_SECURITY_ENABLED`   | Enable/disable RBAC security     | `false`                                   |
+
+---
+
+## 🔐 Security (RBAC)
+
+Security is **disabled by default** so anyone can clone the repo and start immediately. When needed, activate the `secure` Spring profile to enable Role-Based Access Control (RBAC) with HTTP Basic authentication.
+
+### Roles
+
+| Role        | Fraud API (Read) | Submit Transactions | Rules API (Read) | Rules API (Write) |
+|-------------|:----------------:|:-------------------:|:----------------:|:-----------------:|
+| **ADMIN**   |        ✅         |          ✅          |        ✅         |         ✅         |
+| **ANALYST** |        ✅         |          ✅          |        ✅         |         ❌         |
+
+### Default Users (when security is enabled)
+
+| Username   | Password   | Role      |
+|------------|------------|-----------|
+| `admin`    | `admin`    | ADMIN     |
+| `analyst`  | `analyst`  | ANALYST   |
+
+### How to Enable Security
+
+**Local development:**
+```bash
+# Without security (default) - just works
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+
+# With security
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local,secure
+```
+
+**Docker Compose:**
+```bash
+# Without security (default) - just works
+docker-compose up -d
+
+# With security
+docker-compose -f docker-compose.yml -f docker-compose.secure.yml up -d
+```
+
+**Testing with security enabled:**
+```bash
+# As admin (full access)
+curl -u admin:admin http://localhost:9080/v1/api/fraud/flag-items
+
+# As analyst (read-only fraud + submit transactions)
+curl -u analyst:analyst http://localhost:9080/v1/api/fraud/flag-items
+
+# Analyst CANNOT manage rules (returns 403)
+curl -u analyst:analyst -X POST http://localhost:9080/api/v1/rules -d '{}' -H 'Content-Type: application/json'
+```
+
+### Custom Users
+
+Add users in `application-secure.yml` or via environment variables:
+
+```yaml
+app:
+  security:
+    enabled: true
+    users:
+      - username: admin
+        password: admin
+        role: ADMIN
+      - username: analyst
+        password: analyst
+        role: ANALYST
+      - username: viewer
+        password: viewer123
+        role: ANALYST
+```
+
+---
+
+## 📝 Audit Trail
+
+All API operations (except actuator/swagger endpoints) are automatically logged to the `fraud.audit_trail` database table. Each audit entry includes:
+
+| Field             | Description                               |
+|-------------------|-------------------------------------------|
+| `trace_id`        | Request trace ID from `X-Trace-Id` header |
+| `principal`       | Authenticated user or "anonymous"         |
+| `http_method`     | HTTP method (GET, POST, etc.)             |
+| `uri`             | Request URI path                          |
+| `response_status` | HTTP response status code                 |
+| `timestamp`       | When the request was processed            |
+
+---
+
+## 🔒 PII Masking in Logs
+
+Sensitive data is automatically masked in all log output:
+
+| Field                 | Example Input      | Masked Output     |
+|-----------------------|--------------------|-------------------|
+| `account_id`          | `123456`           | `***`             |
+| `user_id`             | `789`              | `***`             |
+| `beneficiary_account` | `987654`           | `***`             |
+| `ip_address`          | `192.168.1.100`    | `***.***.***.***` |
+| `device_id`           | `device-12345`     | `***`             |
+| `geo_location`        | `-33.9249,18.4241` | `***`             |
 
 ---
 
@@ -196,7 +303,7 @@ curl -X POST 'http://localhost:9080/v1/api/fraud/transactions' \
     "user_id": 789,
     "currency": "ZAR",
     "amount": 50000.00,
-    "timestamp": "2026-04-14T10:30:00Z",
+    "timestamp": "2026-04-14T10:30:00",
     "transaction_type": "TRANSFER",
     "channel": "WEB",
     "merchant_id": "M001",
@@ -280,13 +387,13 @@ curl http://localhost:9080/actuator/prometheus
 
 ### Available Endpoints
 
-| Endpoint | Description |
-|----------|-------------|
-| `/actuator/health` | Health status |
-| `/actuator/health/liveness` | Kubernetes liveness probe |
+| Endpoint                     | Description                |
+|------------------------------|----------------------------|
+| `/actuator/health`           | Health status              |
+| `/actuator/health/liveness`  | Kubernetes liveness probe  |
 | `/actuator/health/readiness` | Kubernetes readiness probe |
-| `/actuator/metrics` | Application metrics |
-| `/actuator/prometheus` | Prometheus format metrics |
+| `/actuator/metrics`          | Application metrics        |
+| `/actuator/prometheus`       | Prometheus format metrics  |
 
 ---
 
@@ -333,10 +440,14 @@ Fraud Rule Engine API.postman_collection.json
 ### How to Use
 
 1. **Import the Collection**: Import `postman/Fraud Rule Engine API.postman_collection.json` into Postman
-2. **Set Environment Variables**:
+2. **Set Collection Variables**:
    - `base_url`: `http://localhost:9080`
    - `trace_id`: `test-trace-123`
-3. **Run Scenarios**: Execute requests in order or use the Collection Runner
+   - `auth_username`: `admin` (only needed when security is enabled)
+   - `auth_password`: `admin` (only needed when security is enabled)
+3. **Without Security**: All requests work out of the box — the server ignores the Basic Auth header when security is disabled
+4. **With Security**: The collection uses Basic Auth at the collection level. Switch user by changing `auth_username`/`auth_password` variables
+5. **Run Scenarios**: Execute requests in order or use the Collection Runner
 
 ### Key Scenarios Covered
 
@@ -352,13 +463,13 @@ Fraud Rule Engine API.postman_collection.json
 
 ### Design Patterns Used
 
-| Pattern | Implementation |
-|---------|----------------|
-| **Strategy** | Condition evaluators for different comparison types |
-| **Factory** | `ConditionEvaluatorFactory` for evaluator management |
-| **Template Method** | `AbstractConditionEvaluator` base class |
-| **Repository** | Spring Data JPA repositories |
-| **Builder** | Lombok `@Builder` for object construction |
+| Pattern             | Implementation                                       |
+|---------------------|------------------------------------------------------|
+| **Strategy**        | Condition evaluators for different comparison types  |
+| **Factory**         | `ConditionEvaluatorFactory` for evaluator management |
+| **Template Method** | `AbstractConditionEvaluator` base class              |
+| **Repository**      | Spring Data R2DBC reactive repositories              |
+| **Builder**         | Lombok `@Builder` for object construction            |
 
 ### SOLID Principles
 
@@ -382,7 +493,7 @@ src/main/java/org/project/fraudruleapi/
 │   │   └── strategy/          # Strategy pattern evaluators
 │   ├── mapper/
 │   ├── model/
-│   ├── repository/
+│   ├── repository/            # Includes custom R2DBC DatabaseClient impl
 │   └── service/
 ├── rules/
 │   ├── controller/
@@ -392,6 +503,7 @@ src/main/java/org/project/fraudruleapi/
 │   ├── repository/
 │   └── service/
 └── shared/
+    ├── audit/
     ├── cache/
     ├── config/
     ├── converter/
@@ -400,6 +512,7 @@ src/main/java/org/project/fraudruleapi/
     ├── filter/
     ├── log/
     ├── scheduler/
+    ├── security/
     ├── util/
     └── validator/
 ```

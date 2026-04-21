@@ -1,20 +1,21 @@
 {
   "info": {
     "name": "Fraud Rule Engine API",
-    "description": "Comprehensive API collection for Fraud Rule Engine with all possible scenarios",
+    "description": "Comprehensive API test collection for the Fraud Rule Engine.\n\n**New Features Covered:**\n- Weighted risk scoring (each rule/check has a configurable weight, capped at 100)\n- New rule condition types: BETWEEN, REGEX, STARTS_WITH, ENDS_WITH, CONTAINS\n- Built-in fraud checks: Cross-Border, Self-Transfer, High-Value Amount, Off-Hours\n- Duplicate transaction detection\n- Pagination with max page size cap (100)\n\n**Security Modes:**\n- **No Security (default):** All requests work without authentication\n- **Secure Mode:** Set `auth_enabled` to `true` and use Basic Auth credentials\n\n**RBAC Roles:**\n- `admin/admin` → ROLE_ADMIN (full access: CRUD rules + fraud data)\n- `analyst/analyst` → ROLE_ANALYST (read fraud data + submit transactions, no rule management)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "auth": {
+    "type": "basic",
+    "basic": [
+      { "key": "username", "value": "{{auth_username}}", "type": "string" },
+      { "key": "password", "value": "{{auth_password}}", "type": "string" }
+    ]
+  },
   "variable": [
-    {
-      "key": "base_url",
-      "value": "http://localhost:9080",
-      "type": "string"
-    },
-    {
-      "key": "trace_id",
-      "value": "test-trace-123",
-      "type": "string"
-    }
+    { "key": "base_url", "value": "http://localhost:9080", "type": "string" },
+    { "key": "trace_id", "value": "test-trace-123", "type": "string" },
+    { "key": "auth_username", "value": "admin", "type": "string" },
+    { "key": "auth_password", "value": "admin", "type": "string" }
   ],
   "item": [
     {
@@ -24,22 +25,39 @@
           "name": "Validate Transaction",
           "item": [
             {
-              "name": "Normal Transaction (No Fraud)",
+              "name": "Normal Transaction - No Fraud (ZAR, low amount, business hours)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                      "pm.test('Response has required fields', () => {",
+                      "    const json = pm.response.json();",
+                      "    pm.expect(json).to.have.property('transactionId');",
+                      "    pm.expect(json).to.have.property('isFraud');",
+                      "    pm.expect(json).to.have.property('riskScore');",
+                      "    pm.expect(json).to.have.property('severity');",
+                      "    pm.expect(json).to.have.property('matchedRules');",
+                      "    pm.expect(json).to.have.property('processingTimeMs');",
+                      "});",
+                      "pm.test('No fraud detected', () => {",
+                      "    pm.expect(pm.response.json().isFraud).to.eql(false);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"transaction_id\": \"TXN-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 500.00,\n  \"timestamp\": \"2026-04-14T10:30:00Z\",\n  \"transaction_type\": \"DEPOSIT\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"192.168.1.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                  "raw": "{\n  \"transaction_id\": \"TXN-NORMAL-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 500.00,\n  \"timestamp\": \"2026-04-14T10:30:00\",\n  \"transaction_type\": \"DEPOSIT\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"41.13.252.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/v1/api/fraud/transactions",
@@ -50,22 +68,30 @@
               "response": []
             },
             {
-              "name": "High Value Transaction (Fraud)",
+              "name": "High Value ZAR Transfer > 1M (Rule 0001 - weight 35)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Fraud detected', () => pm.expect(pm.response.json().isFraud).to.eql(true));",
+                      "pm.test('Risk score > 0', () => pm.expect(pm.response.json().riskScore).to.be.above(0));",
+                      "pm.test('Has matched rules', () => pm.expect(pm.response.json().matchedRules.length).to.be.above(0));"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"transaction_id\": \"TXN-002\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 1500000.00,\n  \"timestamp\": \"2026-04-14T10:31:00Z\",\n  \"transaction_type\": \"TRANSFER\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"192.168.1.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                  "raw": "{\n  \"transaction_id\": \"TXN-HIGHVAL-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 1500000.00,\n  \"timestamp\": \"2026-04-14T10:31:00\",\n  \"transaction_type\": \"TRANSFER\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"41.13.252.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/v1/api/fraud/transactions",
@@ -76,22 +102,28 @@
               "response": []
             },
             {
-              "name": "Velocity Limit Exceeded (Fraud)",
+              "name": "Blacklisted Beneficiary (Rule 0002 - weight 40)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Fraud detected', () => pm.expect(pm.response.json().isFraud).to.eql(true));"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"transaction_id\": \"TXN-003\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 100.00,\n  \"timestamp\": \"2026-04-14T10:32:00Z\",\n  \"transaction_type\": \"TRANSFER\",\n  \"channel\": \"MOBILE_APP\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"192.168.1.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                  "raw": "{\n  \"transaction_id\": \"TXN-BLACKLIST-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 5000.00,\n  \"timestamp\": \"2026-04-14T10:32:00\",\n  \"transaction_type\": \"TRANSFER\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 32142347,\n  \"ip_address\": \"41.13.252.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/v1/api/fraud/transactions",
@@ -102,22 +134,28 @@
               "response": []
             },
             {
-              "name": "Multiple Rules Triggered (Fraud)",
+              "name": "Suspicious Amount Range 500K-1M (Rule 0003 BETWEEN - weight 20)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Fraud detected', () => pm.expect(pm.response.json().isFraud).to.eql(true));"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"transaction_id\": \"TXN-004\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"USD\",\n  \"amount\": 2000000.00,\n  \"timestamp\": \"2026-04-14T10:33:00Z\",\n  \"transaction_type\": \"TRANSFER\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"192.168.1.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                  "raw": "{\n  \"transaction_id\": \"TXN-BETWEEN-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 750000.00,\n  \"timestamp\": \"2026-04-14T10:33:00\",\n  \"transaction_type\": \"DEPOSIT\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"41.13.252.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/v1/api/fraud/transactions",
@@ -128,18 +166,398 @@
               "response": []
             },
             {
-              "name": "Invalid Request (Error)",
+              "name": "High-Value Wire Transfer > 250K (Rule 0004 - weight 30)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Fraud detected', () => pm.expect(pm.response.json().isFraud).to.eql(true));"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-WIRE-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 500000.00,\n  \"timestamp\": \"2026-04-14T10:34:00\",\n  \"transaction_type\": \"WIRE_TRANSFER\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Investment Corp\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"41.13.252.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Suspicious Merchant CONTAINS 'crypto' (Rule 0005 - weight 15)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Fraud detected', () => pm.expect(pm.response.json().isFraud).to.eql(true));"
+                    ]
                   }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-MERCHANT-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 1000.00,\n  \"timestamp\": \"2026-04-14T10:35:00\",\n  \"transaction_type\": \"CARD_PAYMENT\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"CRYPTO-001\",\n  \"merchant_name\": \"Crypto Exchange Platform\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"41.13.252.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Private IP STARTS_WITH '192.168.' (Rule 0006 - weight 10)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200 or 201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-PRIVIP-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 500.00,\n  \"timestamp\": \"2026-04-14T10:36:00\",\n  \"transaction_type\": \"DEPOSIT\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"192.168.1.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "High-Value Mobile Payment > 100K (Rule 0007 - weight 25)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Fraud detected', () => pm.expect(pm.response.json().isFraud).to.eql(true));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-MOBILE-001\",\n  \"account_id\": 555555,\n  \"user_id\": 100,\n  \"currency\": \"ZAR\",\n  \"amount\": 200000.00,\n  \"timestamp\": \"2026-04-14T12:00:00\",\n  \"transaction_type\": \"MOBILE_PAYMENT\",\n  \"channel\": \"MOBILE_APP\",\n  \"merchant_id\": \"M-MOBILE-001\",\n  \"merchant_name\": \"PayFast\",\n  \"beneficiary_account\": 444444,\n  \"ip_address\": \"41.13.252.100\",\n  \"device_id\": \"iphone-14-abc\",\n  \"geo_location\": \"-26.2041,28.0473\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Large ATM Withdrawal > 20K (Rule 0008 - weight 20)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Fraud detected', () => pm.expect(pm.response.json().isFraud).to.eql(true));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-ATM-001\",\n  \"account_id\": 555555,\n  \"user_id\": 100,\n  \"currency\": \"ZAR\",\n  \"amount\": 50000.00,\n  \"timestamp\": \"2026-04-14T14:00:00\",\n  \"transaction_type\": \"WITHDRAWAL\",\n  \"channel\": \"ATM\",\n  \"merchant_id\": \"ATM-JHB-001\",\n  \"merchant_name\": \"FNB ATM Sandton\",\n  \"beneficiary_account\": 555555,\n  \"ip_address\": \"41.13.252.100\",\n  \"device_id\": \"atm-terminal-001\",\n  \"geo_location\": \"-26.1076,28.0567\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Cross-Border Check - Foreign Currency USD",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200 or 201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                      "pm.test('Response has severity', () => pm.expect(pm.response.json()).to.have.property('severity'));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-CROSSBORDER-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"USD\",\n  \"amount\": 5000.00,\n  \"timestamp\": \"2026-04-14T10:40:00\",\n  \"transaction_type\": \"TRANSFER\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"International Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"41.13.252.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Self-Transfer Check - Same Account and Beneficiary",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200 or 201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-SELFTX-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 1000.00,\n  \"timestamp\": \"2026-04-14T10:41:00\",\n  \"transaction_type\": \"TRANSFER\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Self Transfer\",\n  \"beneficiary_account\": 123456,\n  \"ip_address\": \"41.13.252.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Off-Hours Check - Transaction at 3 AM",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200 or 201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-OFFHRS-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 5000.00,\n  \"timestamp\": \"2026-04-14T03:15:00\",\n  \"transaction_type\": \"TRANSFER\",\n  \"channel\": \"MOBILE_APP\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Night Transfer\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"41.13.252.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "High-Value Amount Check > 1M (Built-in check)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Fraud detected', () => pm.expect(pm.response.json().isFraud).to.eql(true));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-HIVAL-001\",\n  \"account_id\": 777777,\n  \"user_id\": 300,\n  \"currency\": \"ZAR\",\n  \"amount\": 2000000.00,\n  \"timestamp\": \"2026-04-14T11:00:00\",\n  \"transaction_type\": \"EFT\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M-EFT-001\",\n  \"merchant_name\": \"Property Transfer\",\n  \"beneficiary_account\": 888888,\n  \"ip_address\": \"41.13.252.100\",\n  \"device_id\": \"office-pc-001\",\n  \"geo_location\": \"-25.7479,28.2293\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Multiple Rules - USD + High Amount + Off-Hours + Cross-Border",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Fraud detected with high risk', () => {",
+                      "    const json = pm.response.json();",
+                      "    pm.expect(json.isFraud).to.eql(true);",
+                      "    pm.expect(json.riskScore).to.be.above(30);",
+                      "});",
+                      "pm.test('Multiple rules matched', () => pm.expect(pm.response.json().matchedRules.length).to.be.above(1));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-MULTI-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"USD\",\n  \"amount\": 2000000.00,\n  \"timestamp\": \"2026-04-14T02:30:00\",\n  \"transaction_type\": \"WIRE_TRANSFER\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"FOREX-001\",\n  \"merchant_name\": \"Forex Trading Platform\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"192.168.1.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Duplicate Transaction (Same ID as TXN-NORMAL-001)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 201 (duplicate returns created)', () => pm.response.to.have.status(201));",
+                      "pm.test('Severity is DUPLICATE', () => pm.expect(pm.response.json().severity).to.eql('DUPLICATE'));",
+                      "pm.test('Not flagged as fraud', () => pm.expect(pm.response.json().isFraud).to.eql(false));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-NORMAL-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 500.00,\n  \"timestamp\": \"2026-04-14T10:30:00\",\n  \"transaction_type\": \"DEPOSIT\",\n  \"channel\": \"WEB\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"41.13.252.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Velocity Limit Test (Rapid Fire)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transaction_id\": \"TXN-VELOCITY-001\",\n  \"account_id\": 123456,\n  \"user_id\": 789,\n  \"currency\": \"ZAR\",\n  \"amount\": 100.00,\n  \"timestamp\": \"2026-04-14T10:45:00\",\n  \"transaction_type\": \"TRANSFER\",\n  \"channel\": \"MOBILE_APP\",\n  \"merchant_id\": \"M001\",\n  \"merchant_name\": \"Online Store\",\n  \"beneficiary_account\": 987654,\n  \"ip_address\": \"41.13.252.100\",\n  \"device_id\": \"device-12345\",\n  \"geo_location\": \"-33.9249,18.4241\",\n  \"status\": \"PENDING\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/transactions",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "transactions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Invalid Request - Missing Required Fields (400)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "X-Trace-Id", "value": "{{trace_id}}" }
                 ],
                 "body": {
                   "mode": "raw",
@@ -159,48 +577,62 @@
           "name": "Get Flagged Items",
           "item": [
             {
-              "name": "Get All Flagged Items (Paginated)",
+              "name": "Get All Flagged Items (Default Pagination)",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));", "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"] } }],
               "request": {
                 "method": "GET",
-                "header": [
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/v1/api/fraud/flag-items", "host": ["{{base_url}}"], "path": ["v1", "api", "fraud", "flag-items"] }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Flagged Items - Page 0, Size 5",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));", "pm.test('Max 5 items', () => pm.expect(pm.response.json().length).to.be.at.most(5));"] } }],
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
                 "url": {
-                  "raw": "{{base_url}}/v1/api/fraud/flag-items?page=0&size=10",
+                  "raw": "{{base_url}}/v1/api/fraud/flag-items?page=0&size=5",
                   "host": ["{{base_url}}"],
                   "path": ["v1", "api", "fraud", "flag-items"],
-                  "query": [
-                    {
-                      "key": "page",
-                      "value": "0"
-                    },
-                    {
-                      "key": "size",
-                      "value": "10"
-                    }
-                  ]
+                  "query": [{ "key": "page", "value": "0" }, { "key": "size", "value": "5" }]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Flagged Items - Large Size Capped at 100",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));", "pm.test('Capped at 100', () => pm.expect(pm.response.json().length).to.be.at.most(100));"] } }],
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": {
+                  "raw": "{{base_url}}/v1/api/fraud/flag-items?page=0&size=9999",
+                  "host": ["{{base_url}}"],
+                  "path": ["v1", "api", "fraud", "flag-items"],
+                  "query": [{ "key": "page", "value": "0" }, { "key": "size", "value": "9999" }]
                 }
               },
               "response": []
             },
             {
               "name": "Get Specific Flagged Item",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"] } }],
               "request": {
                 "method": "GET",
-                "header": [
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{base_url}}/v1/api/fraud/flag-item/1",
-                  "host": ["{{base_url}}"],
-                  "path": ["v1", "api", "fraud", "flag-item", "1"]
-                }
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/v1/api/fraud/flag-item/1", "host": ["{{base_url}}"], "path": ["v1", "api", "fraud", "flag-item", "1"] }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Non-Existent Flagged Item (404)",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"] } }],
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/v1/api/fraud/flag-item/9999999", "host": ["{{base_url}}"], "path": ["v1", "api", "fraud", "flag-item", "9999999"] }
               },
               "response": []
             }
@@ -210,20 +642,22 @@
           "name": "Get Fraud by Account",
           "item": [
             {
-              "name": "Get Fraud Items for Account",
+              "name": "Get Fraud Items for Known Account",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));", "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"] } }],
               "request": {
                 "method": "GET",
-                "header": [
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{base_url}}/v1/api/fraud/account/123456",
-                  "host": ["{{base_url}}"],
-                  "path": ["v1", "api", "fraud", "account", "123456"]
-                }
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/v1/api/fraud/account/123456", "host": ["{{base_url}}"], "path": ["v1", "api", "fraud", "account", "123456"] }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Fraud Items for Unknown Account (Empty)",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));", "pm.test('Empty array', () => pm.expect(pm.response.json().length).to.eql(0));"] } }],
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/v1/api/fraud/account/9999999999", "host": ["{{base_url}}"], "path": ["v1", "api", "fraud", "account", "9999999999"] }
               },
               "response": []
             }
@@ -233,86 +667,52 @@
           "name": "Get Fraud by Severity",
           "item": [
             {
-              "name": "Get High Severity Frauds",
+              "name": "Get CRITICAL Severity",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"] } }],
               "request": {
                 "method": "GET",
-                "header": [
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{base_url}}/v1/api/fraud/severity/HIGH?page=0&size=10",
-                  "host": ["{{base_url}}"],
-                  "path": ["v1", "api", "fraud", "severity", "HIGH"],
-                  "query": [
-                    {
-                      "key": "page",
-                      "value": "0"
-                    },
-                    {
-                      "key": "size",
-                      "value": "10"
-                    }
-                  ]
-                }
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/v1/api/fraud/severity/CRITICAL", "host": ["{{base_url}}"], "path": ["v1", "api", "fraud", "severity", "CRITICAL"] }
               },
               "response": []
             },
             {
-              "name": "Get Medium Severity Frauds",
+              "name": "Get HIGH Severity",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"] } }],
               "request": {
                 "method": "GET",
-                "header": [
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{base_url}}/v1/api/fraud/severity/MEDIUM?page=0&size=10",
-                  "host": ["{{base_url}}"],
-                  "path": ["v1", "api", "fraud", "severity", "MEDIUM"],
-                  "query": [
-                    {
-                      "key": "page",
-                      "value": "0"
-                    },
-                    {
-                      "key": "size",
-                      "value": "10"
-                    }
-                  ]
-                }
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/v1/api/fraud/severity/HIGH", "host": ["{{base_url}}"], "path": ["v1", "api", "fraud", "severity", "HIGH"] }
               },
               "response": []
             },
             {
-              "name": "Get Low Severity Frauds",
+              "name": "Get MEDIUM Severity",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"] } }],
               "request": {
                 "method": "GET",
-                "header": [
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{base_url}}/v1/api/fraud/severity/LOW?page=0&size=10",
-                  "host": ["{{base_url}}"],
-                  "path": ["v1", "api", "fraud", "severity", "LOW"],
-                  "query": [
-                    {
-                      "key": "page",
-                      "value": "0"
-                    },
-                    {
-                      "key": "size",
-                      "value": "10"
-                    }
-                  ]
-                }
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/v1/api/fraud/severity/MEDIUM", "host": ["{{base_url}}"], "path": ["v1", "api", "fraud", "severity", "MEDIUM"] }
+              },
+              "response": []
+            },
+            {
+              "name": "Get LOW Severity",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"] } }],
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/v1/api/fraud/severity/LOW", "host": ["{{base_url}}"], "path": ["v1", "api", "fraud", "severity", "LOW"] }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Invalid Severity (400)",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"] } }],
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/v1/api/fraud/severity/INVALID", "host": ["{{base_url}}"], "path": ["v1", "api", "fraud", "severity", "INVALID"] }
               },
               "response": []
             }
@@ -327,106 +727,114 @@
           "name": "Create Rule",
           "item": [
             {
-              "name": "Simple Rule (Amount > 1000)",
+              "name": "Simple Rule - GREATER_THAN (Amount > 1000)",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"] } }],
               "request": {
                 "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
+                "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Trace-Id", "value": "{{trace_id}}" }],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"ruleId\": \"high-amount-rule\",\n  \"name\": \"High Amount Rule\",\n  \"description\": \"Flag transactions with amount > 1000\",\n  \"condition\": {\n    \"type\": \"GREATER_THAN\",\n    \"field\": \"amount\",\n    \"value\": 1000\n  },\n  \"actions\": [\n    {\n      \"type\": \"FLAG\",\n      \"severity\": \"MEDIUM\"\n    }\n  ],\n  \"enabled\": true\n}"
+                  "raw": "{\n  \"ruleId\": \"high-amount-rule\",\n  \"name\": \"High Amount Rule\",\n  \"description\": \"Flag transactions with amount > 1000\",\n  \"condition\": {\n    \"type\": \"GREATER_THAN\",\n    \"field\": \"amount\",\n    \"value\": 1000\n  },\n  \"actions\": [{ \"type\": \"FLAG\", \"severity\": \"MEDIUM\" }],\n  \"enabled\": true\n}"
                 },
-                "url": {
-                  "raw": "{{base_url}}/api/v1/rules",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "rules"]
-                }
+                "url": { "raw": "{{base_url}}/api/v1/rules", "host": ["{{base_url}}"], "path": ["api", "v1", "rules"] }
               },
               "response": []
             },
             {
-              "name": "Complex Rule (AND condition)",
+              "name": "Complex Rule - AND Condition",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"] } }],
               "request": {
                 "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
+                "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Trace-Id", "value": "{{trace_id}}" }],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"ruleId\": \"complex-rule\",\n  \"name\": \"Complex Rule\",\n  \"description\": \"High amount AND suspicious currency\",\n  \"condition\": {\n    \"type\": \"AND\",\n    \"operands\": [\n      {\n        \"type\": \"GREATER_THAN\",\n        \"field\": \"amount\",\n        \"value\": 50000\n      },\n      {\n        \"type\": \"EQUAL\",\n        \"field\": \"currency\",\n        \"value\": \"USD\"\n      }\n    ]\n  },\n  \"actions\": [\n    {\n      \"type\": \"FLAG\",\n      \"severity\": \"HIGH\"\n    }\n  ],\n  \"enabled\": true\n}"
+                  "raw": "{\n  \"ruleId\": \"complex-and-rule\",\n  \"name\": \"Complex AND Rule\",\n  \"description\": \"High amount AND suspicious currency\",\n  \"condition\": {\n    \"type\": \"AND\",\n    \"operands\": [\n      { \"type\": \"GREATER_THAN\", \"field\": \"amount\", \"value\": 50000 },\n      { \"type\": \"EQUAL\", \"field\": \"currency\", \"value\": \"USD\" }\n    ]\n  },\n  \"actions\": [{ \"type\": \"FLAG\", \"severity\": \"HIGH\" }],\n  \"enabled\": true\n}"
                 },
-                "url": {
-                  "raw": "{{base_url}}/api/v1/rules",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "rules"]
-                }
+                "url": { "raw": "{{base_url}}/api/v1/rules", "host": ["{{base_url}}"], "path": ["api", "v1", "rules"] }
               },
               "response": []
             },
             {
-              "name": "Velocity Rule",
+              "name": "BETWEEN Rule - Suspicious Amount Range",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"] } }],
               "request": {
                 "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
+                "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Trace-Id", "value": "{{trace_id}}" }],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"ruleId\": \"velocity-rule\",\n  \"name\": \"Velocity Rule\",\n  \"description\": \"Too many transactions in short time\",\n  \"condition\": {\n    \"type\": \"VELOCITY_CHECK\",\n    \"field\": \"accountId\",\n    \"value\": 5,\n    \"timeWindow\": 300\n  },\n  \"actions\": [\n    {\n      \"type\": \"FLAG\",\n      \"severity\": \"HIGH\"\n    }\n  ],\n  \"enabled\": true\n}"
+                  "raw": "{\n  \"ruleId\": \"between-amount-rule\",\n  \"name\": \"Suspicious Amount Range\",\n  \"description\": \"Flag amounts between 500K and 1M\",\n  \"condition\": {\n    \"type\": \"BETWEEN\",\n    \"field\": \"transferAmount\",\n    \"value\": [500000, 1000000]\n  },\n  \"actions\": [{ \"type\": \"FLAG\", \"severity\": \"MEDIUM\" }],\n  \"enabled\": true\n}"
                 },
-                "url": {
-                  "raw": "{{base_url}}/api/v1/rules",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "rules"]
-                }
+                "url": { "raw": "{{base_url}}/api/v1/rules", "host": ["{{base_url}}"], "path": ["api", "v1", "rules"] }
               },
               "response": []
             },
             {
-              "name": "Invalid Rule (Error)",
+              "name": "CONTAINS Rule - Merchant Screening",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"] } }],
               "request": {
                 "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
+                "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Trace-Id", "value": "{{trace_id}}" }],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"ruleId\": \"\",\n  \"name\": \"\",\n  \"condition\": {\n    \"type\": \"INVALID_TYPE\"\n  }\n}"
+                  "raw": "{\n  \"ruleId\": \"merchant-screening-rule\",\n  \"name\": \"Merchant Screening\",\n  \"description\": \"Flag merchants containing gambling keyword\",\n  \"condition\": {\n    \"type\": \"CONTAINS\",\n    \"field\": \"merchantName\",\n    \"value\": \"gambling\"\n  },\n  \"actions\": [{ \"type\": \"FLAG\", \"severity\": \"HIGH\" }],\n  \"enabled\": true\n}"
                 },
-                "url": {
-                  "raw": "{{base_url}}/api/v1/rules",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "rules"]
-                }
+                "url": { "raw": "{{base_url}}/api/v1/rules", "host": ["{{base_url}}"], "path": ["api", "v1", "rules"] }
+              },
+              "response": []
+            },
+            {
+              "name": "STARTS_WITH Rule - IP Range Check",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"] } }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ruleId\": \"ip-range-rule\",\n  \"name\": \"Private IP Check\",\n  \"description\": \"Flag transactions from private 10.x IPs\",\n  \"condition\": {\n    \"type\": \"STARTS_WITH\",\n    \"field\": \"ipAddress\",\n    \"value\": \"10.\"\n  },\n  \"actions\": [{ \"type\": \"FLAG\", \"severity\": \"LOW\" }],\n  \"enabled\": true\n}"
+                },
+                "url": { "raw": "{{base_url}}/api/v1/rules", "host": ["{{base_url}}"], "path": ["api", "v1", "rules"] }
+              },
+              "response": []
+            },
+            {
+              "name": "REGEX Rule - IP Pattern",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"] } }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ruleId\": \"regex-ip-rule\",\n  \"name\": \"Regex IP Pattern\",\n  \"description\": \"Flag IPs matching suspicious pattern\",\n  \"condition\": {\n    \"type\": \"REGEX\",\n    \"field\": \"ipAddress\",\n    \"value\": \"^10\\\\.0\\\\..*\"\n  },\n  \"actions\": [{ \"type\": \"FLAG\", \"severity\": \"MEDIUM\" }],\n  \"enabled\": true\n}"
+                },
+                "url": { "raw": "{{base_url}}/api/v1/rules", "host": ["{{base_url}}"], "path": ["api", "v1", "rules"] }
+              },
+              "response": []
+            },
+            {
+              "name": "OR Condition Rule",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 201', () => pm.response.to.have.status(201));"] } }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ruleId\": \"or-condition-rule\",\n  \"name\": \"OR Condition Rule\",\n  \"description\": \"Flag if USD currency OR amount > 500000\",\n  \"condition\": {\n    \"type\": \"OR\",\n    \"operands\": [\n      { \"type\": \"EQUAL\", \"field\": \"currency\", \"value\": \"USD\" },\n      { \"type\": \"GREATER_THAN\", \"field\": \"transferAmount\", \"value\": 500000 }\n    ]\n  },\n  \"actions\": [{ \"type\": \"FLAG\", \"severity\": \"MEDIUM\" }],\n  \"enabled\": true\n}"
+                },
+                "url": { "raw": "{{base_url}}/api/v1/rules", "host": ["{{base_url}}"], "path": ["api", "v1", "rules"] }
+              },
+              "response": []
+            },
+            {
+              "name": "Invalid Rule - Missing Required Fields (400)",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 400', () => pm.response.to.have.status(400));"] } }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ruleId\": \"\",\n  \"name\": \"\",\n  \"condition\": { \"type\": \"INVALID_TYPE\" }\n}"
+                },
+                "url": { "raw": "{{base_url}}/api/v1/rules", "host": ["{{base_url}}"], "path": ["api", "v1", "rules"] }
               },
               "response": []
             }
@@ -437,55 +845,41 @@
           "item": [
             {
               "name": "Get All Rules",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));", "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"] } }],
               "request": {
                 "method": "GET",
-                "header": [
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/rules",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "rules"]
-                }
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/api/v1/rules", "host": ["{{base_url}}"], "path": ["api", "v1", "rules"] }
               },
               "response": []
             },
             {
               "name": "Get Specific Rule",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"] } }],
               "request": {
                 "method": "GET",
-                "header": [
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/rules/high-amount-rule",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "rules", "high-amount-rule"]
-                }
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/api/v1/rules/high-amount-rule", "host": ["{{base_url}}"], "path": ["api", "v1", "rules", "high-amount-rule"] }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Non-Existent Rule (404)",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"] } }],
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/api/v1/rules/non-existent-rule", "host": ["{{base_url}}"], "path": ["api", "v1", "rules", "non-existent-rule"] }
               },
               "response": []
             },
             {
               "name": "Get Active Rule",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"] } }],
               "request": {
                 "method": "GET",
-                "header": [
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/rules/active",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "rules", "active"]
-                }
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/api/v1/rules/active", "host": ["{{base_url}}"], "path": ["api", "v1", "rules", "active"] }
               },
               "response": []
             }
@@ -496,27 +890,29 @@
           "item": [
             {
               "name": "Update Existing Rule",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 200', () => pm.response.to.have.status(200));"] } }],
               "request": {
                 "method": "PUT",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
+                "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Trace-Id", "value": "{{trace_id}}" }],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"ruleId\": \"high-amount-rule\",\n  \"name\": \"Updated High Amount Rule\",\n  \"description\": \"Updated: Flag transactions with amount > 2000\",\n  \"condition\": {\n    \"type\": \"GREATER_THAN\",\n    \"field\": \"amount\",\n    \"value\": 2000\n  },\n  \"actions\": [\n    {\n      \"type\": \"FLAG\",\n      \"severity\": \"HIGH\"\n    }\n  ],\n  \"enabled\": true\n}"
+                  "raw": "{\n  \"ruleId\": \"high-amount-rule\",\n  \"name\": \"Updated High Amount Rule\",\n  \"description\": \"Updated: Flag transactions with amount > 2000\",\n  \"condition\": {\n    \"type\": \"GREATER_THAN\",\n    \"field\": \"amount\",\n    \"value\": 2000\n  },\n  \"actions\": [{ \"type\": \"FLAG\", \"severity\": \"HIGH\" }],\n  \"enabled\": true\n}"
                 },
-                "url": {
-                  "raw": "{{base_url}}/api/v1/rules/high-amount-rule",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "rules", "high-amount-rule"]
-                }
+                "url": { "raw": "{{base_url}}/api/v1/rules/high-amount-rule", "host": ["{{base_url}}"], "path": ["api", "v1", "rules", "high-amount-rule"] }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Non-Existent Rule (404)",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"] } }],
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ruleId\": \"ghost-rule\",\n  \"name\": \"Ghost\",\n  \"condition\": { \"type\": \"GREATER_THAN\", \"field\": \"amount\", \"value\": 100 },\n  \"actions\": [],\n  \"enabled\": true\n}"
+                },
+                "url": { "raw": "{{base_url}}/api/v1/rules/ghost-rule", "host": ["{{base_url}}"], "path": ["api", "v1", "rules", "ghost-rule"] }
               },
               "response": []
             }
@@ -527,19 +923,21 @@
           "item": [
             {
               "name": "Delete Existing Rule",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 204', () => pm.response.to.have.status(204));"] } }],
               "request": {
                 "method": "DELETE",
-                "header": [
-                  {
-                    "key": "X-Trace-Id",
-                    "value": "{{trace_id}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/rules/high-amount-rule",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "rules", "high-amount-rule"]
-                }
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/api/v1/rules/high-amount-rule", "host": ["{{base_url}}"], "path": ["api", "v1", "rules", "high-amount-rule"] }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Non-Existent Rule (404)",
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status is 404', () => pm.response.to.have.status(404));"] } }],
+              "request": {
+                "method": "DELETE",
+                "header": [{ "key": "X-Trace-Id", "value": "{{trace_id}}" }],
+                "url": { "raw": "{{base_url}}/api/v1/rules/non-existent-rule", "host": ["{{base_url}}"], "path": ["api", "v1", "rules", "non-existent-rule"] }
               },
               "response": []
             }

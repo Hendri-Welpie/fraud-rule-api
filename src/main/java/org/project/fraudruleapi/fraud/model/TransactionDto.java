@@ -14,6 +14,8 @@ import java.time.LocalDateTime;
 @Builder
 public record TransactionDto(
         @NotBlank(message = "Transaction ID cannot be null or blank")
+        @Size(max = 64, message = "Transaction ID must not exceed 64 characters")
+        @Pattern(regexp = "^[a-zA-Z0-9\\-_]+$", message = "Transaction ID contains invalid characters")
         @JsonProperty("transaction_id")
         String transactionId,
 
@@ -49,10 +51,14 @@ public record TransactionDto(
         ChannelType channel,
 
         @NotBlank(message = "Merchant ID cannot be null or blank")
+        @Size(max = 64, message = "Merchant ID must not exceed 64 characters")
+        @Pattern(regexp = "^[a-zA-Z0-9\\-_]+$", message = "Merchant ID contains invalid characters")
         @JsonProperty("merchant_id")
         String merchantId,
 
         @NotBlank(message = "Merchant Name cannot be null or blank")
+        @Size(max = 255, message = "Merchant Name must not exceed 255 characters")
+        @Pattern(regexp = "^[a-zA-Z0-9 .,'\\-&]+$", message = "Merchant Name contains invalid characters")
         @JsonProperty("merchant_name")
         String merchantName,
 
@@ -62,14 +68,20 @@ public record TransactionDto(
         Long beneficiaryAccount,
 
         @NotBlank(message = "IP Address cannot be null or blank")
+        @Size(max = 45, message = "IP Address must not exceed 45 characters")
+        @Pattern(regexp = "^[0-9a-fA-F.:]+$", message = "IP Address contains invalid characters")
         @JsonProperty("ip_address")
         String ipAddress,
 
         @NotBlank(message = "Device Id cannot be null or blank")
+        @Size(max = 128, message = "Device ID must not exceed 128 characters")
+        @Pattern(regexp = "^[a-zA-Z0-9\\-_:.]+$", message = "Device ID contains invalid characters")
         @JsonProperty("device_id")
         String deviceId,
 
         @NotBlank(message = "Location cannot be null or blank")
+        @Size(max = 255, message = "Location must not exceed 255 characters")
+        @Pattern(regexp = "^[a-zA-Z0-9 .,\\-/]+$", message = "Location contains invalid characters")
         @JsonProperty("geo_location")
         String location,
 

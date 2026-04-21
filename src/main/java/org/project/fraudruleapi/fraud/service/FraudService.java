@@ -39,6 +39,10 @@ public class FraudService {
     private final TransactionRepository transactionRepository;
     private final ApplicationConfiguration config;
     private final VelocityCheckService velocityCheckService;
+    private final CrossBorderCheckService crossBorderCheckService;
+    private final SelfTransferCheckService selfTransferCheckService;
+    private final HighValueCheckService highValueCheckService;
+    private final OffHoursCheckService offHoursCheckService;
     private final Counter fraudDetectionCounter;
     private final Counter transactionProcessedCounter;
 
@@ -46,6 +50,24 @@ public class FraudService {
     public Mono<FraudDetectionResponse> validate(@Valid TransactionDto transaction) {
         Instant startTime = Instant.now();
 
+        return transactionRepository.existsByTransactionId(transaction.transactionId())
+                .flatMap(exists -> {
+                    if (exists) {
+                        log.warn("Duplicate transaction detected: {}", transaction.transactionId());
+                        return Mono.just(FraudDetectionResponse.builder()
+                                .transactionId(transaction.transactionId())
+                                .isFraud(false)
+                                .riskScore(0)
+                                .severity("DUPLICATE")
+                                .matchedRules(List.of())
+                                .processingTimeMs(0L)
+                                .build());
+                    }
+                    return processTransaction(transaction, startTime);
+                });
+    }
+
+    private Mono<FraudDetectionResponse> processTransaction(TransactionDto transaction, Instant startTime) {
         return saveTransaction(transaction)
                 .then(performFraudChecks(transaction))
                 .flatMap(results -> {
@@ -88,12 +110,19 @@ public class FraudService {
     private Mono<List<EvaluationResult>> performFraudChecks(TransactionDto transaction) {
         return Mono.zip(
                 evaluateRules(transaction),
-                checkVelocity(transaction)
+                checkVelocity(transaction),
+                crossBorderCheckService.checkCrossBorder(transaction),
+                selfTransferCheckService.checkSelfTransfer(transaction),
+                highValueCheckService.checkHighValue(transaction),
+                offHoursCheckService.checkOffHours(transaction)
         ).map(tuple -> {
-            List<EvaluationResult> ruleResults = new ArrayList<>(tuple.getT1());
-            List<EvaluationResult> velocityResults = tuple.getT2();
-            ruleResults.addAll(velocityResults);
-            return ruleResults;
+            List<EvaluationResult> allResults = new ArrayList<>(tuple.getT1());
+            allResults.addAll(tuple.getT2());
+            allResults.addAll(tuple.getT3());
+            allResults.addAll(tuple.getT4());
+            allResults.addAll(tuple.getT5());
+            allResults.addAll(tuple.getT6());
+            return allResults;
         });
     }
 
@@ -139,9 +168,17 @@ public class FraudService {
                 .doOnSuccess(v -> log.info("Saved {} fraud events for transaction {}", fraudEntities.size(), transaction.transactionId()));
     }
 
+    private static final int DEFAULT_PAGE_SIZE = 50;
+    private static final int MAX_PAGE_SIZE = 100;
+
+    public Flux<FraudEntity> getFlaggedItems(int page, int size) {
+        int validSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        int validPage = Math.max(page, 0);
+        return fraudRepository.findAllPaginated(validSize, (long) validPage * validSize);
+    }
+
     public Flux<FraudEntity> getFlaggedItems() {
-        return fraudRepository.findAll()
-                .sort((a, b) -> b.getDetectedAt().compareTo(a.getDetectedAt()));
+        return getFlaggedItems(0, DEFAULT_PAGE_SIZE);
     }
 
     public Mono<FraudEntity> getFlaggedItem(final long id) {
@@ -153,8 +190,13 @@ public class FraudService {
         return fraudRepository.findByAccountId(accountId);
     }
 
+    public Flux<FraudEntity> getFraudBySeverity(final String severity, int page, int size) {
+        int validSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        int validPage = Math.max(page, 0);
+        return fraudRepository.findBySeverityPaginated(severity, validSize, (long) validPage * validSize);
+    }
+
     public Flux<FraudEntity> getFraudBySeverity(final String severity) {
-        return fraudRepository.findBySeverity(severity)
-                .sort((a, b) -> b.getDetectedAt().compareTo(a.getDetectedAt()));
+        return getFraudBySeverity(severity, 0, DEFAULT_PAGE_SIZE);
     }
 }

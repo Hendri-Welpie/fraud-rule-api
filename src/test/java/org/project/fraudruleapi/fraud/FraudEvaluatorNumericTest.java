@@ -8,7 +8,7 @@ import org.project.fraudruleapi.fraud.evaluator.strategy.*;
 import org.project.fraudruleapi.fraud.model.Condition;
 import org.project.fraudruleapi.fraud.model.TransactionDto;
 import org.project.fraudruleapi.shared.config.ApplicationConfiguration;
-import org.project.fraudruleapi.shared.enums.ConditionalType;
+import org.project.fraudruleapi.shared.enums.ConditionType;
 import org.project.fraudruleapi.shared.enums.TransactionType;
 
 import java.util.List;
@@ -22,23 +22,19 @@ class FraudEvaluatorNumericTest {
 
     @BeforeEach
     void setUp() {
-        // Create real evaluators
         List<ConditionEvaluator> evaluators = List.of(
                 new EqualsEvaluator(),
-                new EqualEvaluator(),
                 new GreaterThanEvaluator(),
                 new GreaterThanOrEqualEvaluator(),
                 new LessThanEvaluator(),
                 new LessThanOrEqualEvaluator(),
                 new IncludeEvaluator(),
-                new NotEqualEvaluator(),
                 new NotEqualsEvaluator()
         );
 
         ConditionEvaluatorFactory factory = new ConditionEvaluatorFactory(evaluators);
         factory.init();
 
-        // Create config
         ApplicationConfiguration config = new ApplicationConfiguration();
         ApplicationConfiguration.FraudConfiguration fraudConfig = new ApplicationConfiguration.FraudConfiguration();
         ApplicationConfiguration.EvaluationConfig evaluationConfig = new ApplicationConfiguration.EvaluationConfig();
@@ -60,15 +56,15 @@ class FraudEvaluatorNumericTest {
     @CsvSource({
             "GREATER_THAN, transferAmount, 500, true",
             "GREATER_THAN, transferAmount, 2000, false",
-            "GREAT_THAN_OR_EQUAL, transferAmount, 1000, true",
-            "GREAT_THAN_OR_EQUAL, transferAmount, 999, true",
+            "GREATER_THAN_OR_EQUAL, transferAmount, 1000, true",
+            "GREATER_THAN_OR_EQUAL, transferAmount, 999, true",
             "LESS_THAN, transferAmount, 1500, true",
             "LESS_THAN, transferAmount, 500, false",
             "LESS_THAN_OR_EQUAL, transferAmount, 1000, true",
             "LESS_THAN_OR_EQUAL, transferAmount, 999, false"
     })
     void testNumericComparisons(String type, String field, double value, boolean expected) {
-        ConditionalType conditionType = ConditionalType.valueOf(type);
+        ConditionType conditionType = ConditionType.valueOf(type);
         Condition cond = new Condition(conditionType, field, value, null);
 
         boolean result = evaluator.evaluateCondition(cond, transactionDto);

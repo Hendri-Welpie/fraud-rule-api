@@ -35,13 +35,11 @@ public class RedisConfig {
         redisConfig.setHostName(hostName);
         redisConfig.setPort(port);
 
-        // Configure socket options for better connection handling
         SocketOptions socketOptions = SocketOptions.builder()
                 .connectTimeout(timeout)
                 .keepAlive(true)
                 .build();
 
-        // Configure client options with auto-reconnect
         ClientOptions clientOptions = ClientOptions.builder()
                 .socketOptions(socketOptions)
                 .autoReconnect(true)

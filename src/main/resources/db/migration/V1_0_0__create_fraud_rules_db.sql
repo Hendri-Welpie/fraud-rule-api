@@ -43,11 +43,6 @@ CREATE TABLE IF NOT EXISTS fraud.fraud_events (
     detected_at TIMESTAMPTZ DEFAULT now()
     );
 
--- =============================================
-
--- DUMP SCRIPT FOR TRANSACTION AND FRAUD TABLES
-
--- =============================================
 
 INSERT INTO fraud.fraud_rules (
     rule_id,
@@ -61,73 +56,127 @@ INSERT INTO fraud.fraud_rules (
     '{
       "created_by": "fraud-admin",
       "created_at": "2025-09-30T16:00:00Z",
-      "updated_at": "2025-09-30T16:25:00Z",
+      "updated_at": "2026-04-21T10:00:00Z",
       "rules": [
         {
           "id": "rule-0001",
           "name": "High value transfer to new beneficiary",
           "description": "Block transfers > 1000000.00 to a new beneficiary",
+          "weight": 35,
           "condition": {
             "type": "AND",
             "operands": [
-              {
-                "type": "EQUALS",
-                "field": "transferType",
-                "value": "TRANSFER"
-              },
-              {
-                "type": "GREATER_THAN",
-                "field": "transferAmount",
-                "value": 1000000.00
-              },
-              {
-                "type": "EQUALS",
-                "field": "currency",
-                "value": "ZAR"
-              }
+              { "type": "EQUALS", "field": "transferType", "value": "TRANSFER" },
+              { "type": "GREATER_THAN", "field": "transferAmount", "value": 1000000.00 },
+              { "type": "EQUALS", "field": "currency", "value": "ZAR" }
             ]
           }
         },
-         {
-              "id": "rule-0002",
-              "name": "Block accounts for beneficiary",
-              "description": "Block transfer for certain blacklisted beneficiaries",
-              "condition": {
-                "type": "AND",
-                "operands": [
-                  {
-                    "type": "EQUALS",
-                    "field": "transactionType",
-                    "value": "TRANSFER"
-                  },
-                  {
-                    "type": "EQUALS",
-                    "field": "currency",
-                    "value": "ZAR"
-                  },
-                  {
-                    "type": "INCLUDE",
-                    "field": "beneficiary_account",
-                    "value": ["32142347", "57437955", "80923904"]
-                  }
-                ]
-              }
-            }
+        {
+          "id": "rule-0002",
+          "name": "Block accounts for beneficiary",
+          "description": "Block transfer for certain blacklisted beneficiaries",
+          "weight": 40,
+          "condition": {
+            "type": "AND",
+            "operands": [
+              { "type": "EQUALS", "field": "transactionType", "value": "TRANSFER" },
+              { "type": "EQUALS", "field": "currency", "value": "ZAR" },
+              { "type": "INCLUDE", "field": "beneficiary_account", "value": ["32142347", "57437955", "80923904"] }
+            ]
+          }
+        },
+        {
+          "id": "rule-0003",
+          "name": "Suspicious amount range",
+          "description": "Flag transactions with amounts between 500000 and 1000000 (suspicious range)",
+          "weight": 20,
+          "condition": {
+            "type": "BETWEEN",
+            "field": "transferAmount",
+            "value": [500000, 1000000]
+          }
+        },
+        {
+          "id": "rule-0004",
+          "name": "High-value wire transfer",
+          "description": "Flag wire transfers exceeding 250000",
+          "weight": 30,
+          "condition": {
+            "type": "AND",
+            "operands": [
+              { "type": "EQUALS", "field": "transactionType", "value": "WIRE_TRANSFER" },
+              { "type": "GREATER_THAN", "field": "transferAmount", "value": 250000 }
+            ]
+          }
+        },
+        {
+          "id": "rule-0005",
+          "name": "Suspicious merchant name keywords",
+          "description": "Flag transactions with merchant names containing suspicious keywords",
+          "weight": 15,
+          "condition": {
+            "type": "OR",
+            "operands": [
+              { "type": "CONTAINS", "field": "merchantName", "value": "casino" },
+              { "type": "CONTAINS", "field": "merchantName", "value": "gambling" },
+              { "type": "CONTAINS", "field": "merchantName", "value": "crypto" },
+              { "type": "CONTAINS", "field": "merchantName", "value": "forex" }
+            ]
+          }
+        },
+        {
+          "id": "rule-0006",
+          "name": "Private IP range transaction",
+          "description": "Flag transactions originating from private/internal IP ranges",
+          "weight": 10,
+          "condition": {
+            "type": "OR",
+            "operands": [
+              { "type": "STARTS_WITH", "field": "ipAddress", "value": "10." },
+              { "type": "STARTS_WITH", "field": "ipAddress", "value": "172." },
+              { "type": "STARTS_WITH", "field": "ipAddress", "value": "192.168." }
+            ]
+          }
+        },
+        {
+          "id": "rule-0007",
+          "name": "High-value mobile payment",
+          "description": "Flag mobile payments exceeding 100000",
+          "weight": 25,
+          "condition": {
+            "type": "AND",
+            "operands": [
+              { "type": "EQUALS", "field": "channel", "value": "MOBILE_APP" },
+              { "type": "GREATER_THAN", "field": "transferAmount", "value": 100000 }
+            ]
+          }
+        },
+        {
+          "id": "rule-0008",
+          "name": "Large ATM withdrawal",
+          "description": "Flag ATM withdrawals exceeding 20000",
+          "weight": 20,
+          "condition": {
+            "type": "AND",
+            "operands": [
+              { "type": "EQUALS", "field": "transactionType", "value": "WITHDRAWAL" },
+              { "type": "EQUALS", "field": "channel", "value": "ATM" },
+              { "type": "GREATER_THAN", "field": "transferAmount", "value": 20000 }
+            ]
+          }
+        }
       ],
       "metadata": {
-        "tags": [
-          "beneficiary",
-          "high-value",
-          "new-beneficiary"
-        ],
+        "tags": ["beneficiary", "high-value", "new-beneficiary", "cross-border", "suspicious-amount", "wire-transfer", "merchant-screening", "channel-specific"],
         "ttl_days": 365,
-        "version": 3
+        "version": 4
       }
     }'::jsonb,
-    3,
+    4,
     true,
     '2025-09-30 16:00:00',
-    '2025-09-30 16:25:00'
+    '2026-04-21 10:00:00'
 )ON CONFLICT(rule_id) DO NOTHING;
 
 -- Insert Rule 0002

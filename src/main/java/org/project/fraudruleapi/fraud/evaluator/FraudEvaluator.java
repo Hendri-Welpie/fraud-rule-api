@@ -16,6 +16,7 @@ import org.project.fraudruleapi.shared.config.ApplicationConfiguration;
 import org.project.fraudruleapi.shared.exception.ConversionException;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,6 +38,19 @@ public class FraudEvaluator {
     private final ApplicationConfiguration config;
 
     private final ExecutorService virtualExecutor = Executors.newVirtualThreadPerTaskExecutor();
+
+    @PreDestroy
+    public void shutdown() {
+        virtualExecutor.shutdown();
+        try {
+            if (!virtualExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                virtualExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            virtualExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
 
     public List<RuleDefinition> getRules(final RuleDto ruleDto) {
         try {
@@ -71,6 +85,7 @@ public class FraudEvaluator {
                         .ruleName(rule.name())
                         .description(rule.description())
                         .matched(true)
+                        .weight(rule.weight() > 0 ? rule.weight() : 25)
                         .evaluationTimeMs(Duration.between(start, Instant.now()).toMillis())
                         .build())
                 .collect(Collectors.toList());
@@ -94,6 +109,7 @@ public class FraudEvaluator {
                             .ruleName(rule.name())
                             .description(rule.description())
                             .matched(matched)
+                            .weight(rule.weight() > 0 ? rule.weight() : 25)
                             .evaluationTimeMs(Duration.between(ruleStart, Instant.now()).toMillis())
                             .build();
                 }, virtualExecutor))
@@ -133,7 +149,7 @@ public class FraudEvaluator {
 
     private boolean evaluateAnd(Condition cond, TransactionDto transactionDto) {
         if (cond.operands() == null || cond.operands().isEmpty()) {
-            return true; // Empty AND is true
+            return true;
         }
         return cond.operands().stream()
                 .allMatch(op -> evaluateCondition(op, transactionDto));
@@ -141,7 +157,7 @@ public class FraudEvaluator {
 
     private boolean evaluateOr(Condition cond, TransactionDto transactionDto) {
         if (cond.operands() == null || cond.operands().isEmpty()) {
-            return false; // Empty OR is false
+            return false;
         }
         return cond.operands().stream()
                 .anyMatch(op -> evaluateCondition(op, transactionDto));
@@ -149,7 +165,7 @@ public class FraudEvaluator {
 
     private boolean evaluateNot(Condition cond, TransactionDto transactionDto) {
         if (cond.operands() == null || cond.operands().isEmpty()) {
-            return true; // NOT of empty is true
+            return true;
         }
         return !evaluateCondition(cond.operands().getFirst(), transactionDto);
     }
@@ -163,7 +179,10 @@ public class FraudEvaluator {
         if (matchedRules == null || matchedRules.isEmpty()) {
             return 0;
         }
-        return Math.min(matchedRules.size() * 25, 100);
+        int totalWeight = matchedRules.stream()
+                .mapToInt(EvaluationResult::weight)
+                .sum();
+        return Math.min(totalWeight, 100);
     }
 
     public String determineSeverity(int riskScore) {

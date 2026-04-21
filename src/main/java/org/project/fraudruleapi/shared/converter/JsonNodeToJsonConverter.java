@@ -1,9 +1,9 @@
 package org.project.fraudruleapi.shared.converter;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.r2dbc.postgresql.codec.Json;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.data.convert.WritingConverter;
-import io.r2dbc.postgresql.codec.Json;
 
 @WritingConverter
 public class JsonNodeToJsonConverter implements Converter<JsonNode, Json> {

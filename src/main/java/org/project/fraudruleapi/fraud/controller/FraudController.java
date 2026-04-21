@@ -10,17 +10,25 @@ import org.project.fraudruleapi.fraud.model.TransactionDto;
 import org.project.fraudruleapi.fraud.service.FraudService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/v1/api/fraud")
 @RequiredArgsConstructor
 public class FraudController implements FraudApi {
 
+    private static final Set<String> VALID_SEVERITIES = Set.of("CRITICAL", "HIGH", "MEDIUM", "LOW");
     private final FraudService fraudService;
 
     @Override
@@ -43,15 +51,17 @@ public class FraudController implements FraudApi {
 
     @Override
     @GetMapping("/flag-items")
-    public Mono<ResponseEntity<List<FraudEntity>>> getFlaggedItems() {
-        return fraudService.getFlaggedItems()
+    public Mono<ResponseEntity<List<FraudEntity>>> getFlaggedItems(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return fraudService.getFlaggedItems(page, size)
                 .collectList()
                 .map(ResponseEntity::ok);
     }
 
     @Override
     @GetMapping("/flag-item/{id}")
-    public Mono<ResponseEntity<FraudEntity>> getFlaggedItem(@PathVariable("id") Long id) {
+    public Mono<ResponseEntity<FraudEntity>> getFlaggedItem(@PathVariable Long id) {
         return fraudService.getFlaggedItem(id)
                 .map(ResponseEntity::ok);
     }
@@ -59,7 +69,7 @@ public class FraudController implements FraudApi {
     @Override
     @GetMapping("/account/{accountId}")
     public Mono<ResponseEntity<List<FraudEntity>>> getFraudByAccountId(
-            @PathVariable("accountId") Long accountId) {
+            @PathVariable Long accountId) {
         return fraudService.getFraudByAccountId(accountId)
                 .collectList()
                 .map(ResponseEntity::ok);
@@ -68,8 +78,12 @@ public class FraudController implements FraudApi {
     @Override
     @GetMapping("/severity/{severity}")
     public Mono<ResponseEntity<List<FraudEntity>>> getFraudBySeverity(
-            @PathVariable("severity") String severity) {
-        return fraudService.getFraudBySeverity(severity)
+            @PathVariable String severity) {
+        String normalizedSeverity = severity.toUpperCase().trim();
+        if (!VALID_SEVERITIES.contains(normalizedSeverity)) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+        return fraudService.getFraudBySeverity(normalizedSeverity)
                 .collectList()
                 .map(ResponseEntity::ok);
     }
@@ -78,10 +92,10 @@ public class FraudController implements FraudApi {
         return Mono.just(ResponseEntity.status(503)
                 .body(FraudDetectionResponse.builder()
                         .transactionId(transaction.transactionId())
-                        .isFraud(false)
-                        .riskScore(0)
-                        .severity("UNKNOWN")
-                        .matchedRules(List.of())
+                        .isFraud(true)
+                        .riskScore(100)
+                        .severity("SUSPICIOUS")
+                        .matchedRules(List.of("CIRCUIT_BREAKER_OPEN"))
                         .processingTimeMs(0L)
                         .build()));
     }

@@ -5,7 +5,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -18,13 +17,17 @@ import org.project.fraudruleapi.fraud.model.RuleDefinition;
 import org.project.fraudruleapi.fraud.model.TransactionDto;
 import org.project.fraudruleapi.fraud.repository.FraudRepository;
 import org.project.fraudruleapi.fraud.repository.TransactionRepository;
+import org.project.fraudruleapi.fraud.service.CrossBorderCheckService;
 import org.project.fraudruleapi.fraud.service.FraudService;
+import org.project.fraudruleapi.fraud.service.HighValueCheckService;
+import org.project.fraudruleapi.fraud.service.OffHoursCheckService;
+import org.project.fraudruleapi.fraud.service.SelfTransferCheckService;
 import org.project.fraudruleapi.fraud.service.VelocityCheckService;
 import org.project.fraudruleapi.rules.model.RuleDto;
 import org.project.fraudruleapi.shared.cache.RuleCache;
 import org.project.fraudruleapi.shared.config.ApplicationConfiguration;
 import org.project.fraudruleapi.shared.enums.ChannelType;
-import org.project.fraudruleapi.shared.enums.ConditionalType;
+import org.project.fraudruleapi.shared.enums.ConditionType;
 import org.project.fraudruleapi.shared.enums.StatusType;
 import org.project.fraudruleapi.shared.enums.TransactionType;
 import org.project.fraudruleapi.shared.exception.ResourceNotFound;
@@ -36,7 +39,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -55,6 +60,14 @@ class FraudServiceTest {
     @Mock
     private VelocityCheckService velocityCheckService;
     @Mock
+    private CrossBorderCheckService crossBorderCheckService;
+    @Mock
+    private SelfTransferCheckService selfTransferCheckService;
+    @Mock
+    private HighValueCheckService highValueCheckService;
+    @Mock
+    private OffHoursCheckService offHoursCheckService;
+    @Mock
     private ApplicationConfiguration.FraudConfiguration fraudConfig;
     @Mock
     private ApplicationConfiguration.VelocityConfig velocityConfig;
@@ -68,7 +81,10 @@ class FraudServiceTest {
     @BeforeEach
     void setup() {
         fraudService = new FraudService(ruleCache, fraudEvaluator, fraudRepository,
-                transactionRepository, config, velocityCheckService, counter, counter);
+                transactionRepository, config, velocityCheckService,
+                crossBorderCheckService, selfTransferCheckService,
+                highValueCheckService, offHoursCheckService,
+                counter, counter);
     }
 
     @Test
@@ -88,7 +104,7 @@ class FraudServiceTest {
                 .id("rule1")
                 .name("High Amount")
                 .description("Amount > 100")
-                .condition(new Condition(ConditionalType.GREATER_THAN, "amount", 100, null))
+                .condition(new Condition(ConditionType.GREATER_THAN, "amount", 100, null))
                 .build();
 
         List<EvaluationResult> results = List.of(
@@ -101,7 +117,6 @@ class FraudServiceTest {
                         .build()
         );
 
-        // Mock config
         when(config.getFraud()).thenReturn(fraudConfig);
         when(fraudConfig.getVelocity()).thenReturn(velocityConfig);
         when(velocityConfig.isEnabled()).thenReturn(false);
@@ -110,6 +125,7 @@ class FraudServiceTest {
         when(riskConfig.getMediumThreshold()).thenReturn(50);
         when(riskConfig.getLowThreshold()).thenReturn(20);
 
+        when(transactionRepository.existsByTransactionId("tx123")).thenReturn(Mono.just(false));
         when(transactionRepository.save(any())).thenReturn(Mono.just(txEntity));
         when(ruleCache.getActiveRule()).thenReturn(Mono.just(new RuleDto()));
         when(fraudEvaluator.getRules(any())).thenReturn(List.of(rule));
@@ -117,6 +133,10 @@ class FraudServiceTest {
         when(fraudEvaluator.calculateRiskScore(any())).thenReturn(25);
         when(fraudEvaluator.determineSeverity(25)).thenReturn("MEDIUM");
         when(fraudRepository.saveAll(any(Iterable.class))).thenReturn(Flux.empty());
+        when(crossBorderCheckService.checkCrossBorder(any())).thenReturn(Mono.just(List.of()));
+        when(selfTransferCheckService.checkSelfTransfer(any())).thenReturn(Mono.just(List.of()));
+        when(highValueCheckService.checkHighValue(any())).thenReturn(Mono.just(List.of()));
+        when(offHoursCheckService.checkOffHours(any())).thenReturn(Mono.just(List.of()));
 
         StepVerifier.create(fraudService.validate(tx))
                 .expectNextMatches(response ->
@@ -145,7 +165,7 @@ class FraudServiceTest {
                 .id("rule1")
                 .name("High Amount")
                 .description("Amount > 100")
-                .condition(new Condition(ConditionalType.GREATER_THAN, "amount", 100, null))
+                .condition(new Condition(ConditionType.GREATER_THAN, "amount", 100, null))
                 .build();
 
         List<EvaluationResult> results = List.of(
@@ -158,7 +178,6 @@ class FraudServiceTest {
                         .build()
         );
 
-        // Mock config with velocity enabled
         when(config.getFraud()).thenReturn(fraudConfig);
         when(fraudConfig.getVelocity()).thenReturn(velocityConfig);
         when(velocityConfig.isEnabled()).thenReturn(true);
@@ -167,8 +186,9 @@ class FraudServiceTest {
         when(riskConfig.getMediumThreshold()).thenReturn(50);
         when(riskConfig.getLowThreshold()).thenReturn(20);
 
-        when(velocityCheckService.checkVelocity(any(TransactionDto.class))).thenReturn(Mono.just(List.of())); // velocity check passes
+        when(velocityCheckService.checkVelocity(any(TransactionDto.class))).thenReturn(Mono.just(List.of()));
 
+        when(transactionRepository.existsByTransactionId("tx123")).thenReturn(Mono.just(false));
         when(transactionRepository.save(any())).thenReturn(Mono.just(txEntity));
         when(ruleCache.getActiveRule()).thenReturn(Mono.just(new RuleDto()));
         when(fraudEvaluator.getRules(any())).thenReturn(List.of(rule));
@@ -176,6 +196,10 @@ class FraudServiceTest {
         when(fraudEvaluator.calculateRiskScore(any())).thenReturn(25);
         when(fraudEvaluator.determineSeverity(25)).thenReturn("MEDIUM");
         when(fraudRepository.saveAll(any(Iterable.class))).thenReturn(Flux.empty());
+        when(crossBorderCheckService.checkCrossBorder(any())).thenReturn(Mono.just(List.of()));
+        when(selfTransferCheckService.checkSelfTransfer(any())).thenReturn(Mono.just(List.of()));
+        when(highValueCheckService.checkHighValue(any())).thenReturn(Mono.just(List.of()));
+        when(offHoursCheckService.checkOffHours(any())).thenReturn(Mono.just(List.of()));
 
         StepVerifier.create(fraudService.validate(tx))
                 .expectNextMatches(response ->
@@ -199,7 +223,7 @@ class FraudServiceTest {
     @Test
     void getFlaggedItems_success() {
         FraudEntity fraud = FraudEntity.builder().id(1L).transactionId("t1").build();
-        when(fraudRepository.findAll()).thenReturn(Flux.just(fraud));
+        when(fraudRepository.findAllPaginated(50, 0L)).thenReturn(Flux.just(fraud));
 
         StepVerifier.create(fraudService.getFlaggedItems())
                 .expectNext(fraud)
@@ -219,10 +243,11 @@ class FraudServiceTest {
     @Test
     void getFraudBySeverity_success() {
         FraudEntity fraud = FraudEntity.builder().id(1L).transactionId("t1").severity("HIGH").build();
-        when(fraudRepository.findBySeverity("HIGH")).thenReturn(Flux.just(fraud));
+        when(fraudRepository.findBySeverityPaginated("HIGH", 50, 0L)).thenReturn(Flux.just(fraud));
 
         StepVerifier.create(fraudService.getFraudBySeverity("HIGH"))
                 .expectNext(fraud)
                 .verifyComplete();
     }
+
 }

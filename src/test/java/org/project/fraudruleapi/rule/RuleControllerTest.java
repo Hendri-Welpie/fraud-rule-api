@@ -37,7 +37,6 @@ class RuleControllerTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
 
-        // Create dummy JSON and RuleDto objects
         mockJson = mock(JsonNode.class);
 
         ruleDto1 = RuleDto.builder()

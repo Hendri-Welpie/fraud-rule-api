@@ -16,10 +16,13 @@ public class TraceFilter implements WebFilter {
     private static final String TRACE_ID = "traceId";
     private static final String HEADER_TRACE_ID = "X-Trace-Id";
 
+    private static final java.util.regex.Pattern TRACE_ID_PATTERN =
+            java.util.regex.Pattern.compile("^[a-zA-Z0-9\\-]{1,64}$");
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String traceId = exchange.getRequest().getHeaders().getFirst(HEADER_TRACE_ID);
-        if (traceId == null || traceId.isBlank()) {
+        if (traceId == null || traceId.isBlank() || !TRACE_ID_PATTERN.matcher(traceId).matches()) {
             traceId = UUID.randomUUID().toString();
         }
 

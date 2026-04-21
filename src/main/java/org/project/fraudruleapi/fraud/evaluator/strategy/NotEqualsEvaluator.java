@@ -2,7 +2,7 @@ package org.project.fraudruleapi.fraud.evaluator.strategy;
 
 import org.project.fraudruleapi.fraud.model.Condition;
 import org.project.fraudruleapi.fraud.model.TransactionDto;
-import org.project.fraudruleapi.shared.enums.ConditionalType;
+import org.project.fraudruleapi.shared.enums.ConditionType;
 import org.springframework.stereotype.Component;
 
 import java.util.Objects;
@@ -11,8 +11,8 @@ import java.util.Objects;
 public class NotEqualsEvaluator extends AbstractConditionEvaluator {
 
     @Override
-    public ConditionalType getSupportedType() {
-        return ConditionalType.NOT_EQUALS;
+    public ConditionType getSupportedType() {
+        return ConditionType.NOT_EQUALS;
     }
 
     @Override

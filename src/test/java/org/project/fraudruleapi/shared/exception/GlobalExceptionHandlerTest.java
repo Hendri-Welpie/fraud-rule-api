@@ -5,16 +5,15 @@ import jakarta.validation.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.project.fraudruleapi.rules.model.ErrorResponse;
+import org.project.fraudruleapi.shared.model.ErrorResponse;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.support.WebExchangeBindException;
 
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(MockitoExtension.class)
 class GlobalExceptionHandlerTest {
@@ -53,7 +52,8 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void handleDataAccessException_shouldReturnServiceUnavailable() {
-        DataAccessException ex = new DataAccessException("DB error") {};
+        DataAccessException ex = new DataAccessException("DB error") {
+        };
 
         ResponseEntity<ErrorResponse> response = handler.handleDataAccessException(ex);
 
@@ -69,5 +69,21 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertEquals("Unexpected error occurred", response.getBody().getMessage());
+    }
+
+    @Test
+    void handleConstraintViolationException_shouldReturnBadRequest() {
+        jakarta.validation.Path path = org.mockito.Mockito.mock(jakarta.validation.Path.class);
+        org.mockito.Mockito.when(path.toString()).thenReturn("field");
+        ConstraintViolation<?> violation = org.mockito.Mockito.mock(ConstraintViolation.class);
+        org.mockito.Mockito.when(violation.getPropertyPath()).thenReturn(path);
+        org.mockito.Mockito.when(violation.getMessage()).thenReturn("must not be null");
+        ConstraintViolationException ex = new ConstraintViolationException(Set.of(violation));
+
+        ResponseEntity<ErrorResponse> response = handler.handleConstraintViolationException(ex);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("Validation failed", response.getBody().getMessage());
+        assertTrue(response.getBody().getErrors().get(0).contains("must not be null"));
     }
 }

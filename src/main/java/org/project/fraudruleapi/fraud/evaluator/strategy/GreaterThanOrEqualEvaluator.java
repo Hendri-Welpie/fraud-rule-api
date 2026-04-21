@@ -2,15 +2,15 @@ package org.project.fraudruleapi.fraud.evaluator.strategy;
 
 import org.project.fraudruleapi.fraud.model.Condition;
 import org.project.fraudruleapi.fraud.model.TransactionDto;
-import org.project.fraudruleapi.shared.enums.ConditionalType;
+import org.project.fraudruleapi.shared.enums.ConditionType;
 import org.springframework.stereotype.Component;
 
 @Component
 public class GreaterThanOrEqualEvaluator extends AbstractConditionEvaluator {
 
     @Override
-    public ConditionalType getSupportedType() {
-        return ConditionalType.GREAT_THAN_OR_EQUAL;
+    public ConditionType getSupportedType() {
+        return ConditionType.GREATER_THAN_OR_EQUAL;
     }
 
     @Override

@@ -1,7 +1,11 @@
 package org.project.fraudruleapi.rules.entity;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;

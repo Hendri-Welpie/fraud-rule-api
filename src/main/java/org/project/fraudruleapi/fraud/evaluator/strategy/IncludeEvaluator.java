@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.project.fraudruleapi.fraud.model.Condition;
 import org.project.fraudruleapi.fraud.model.TransactionDto;
-import org.project.fraudruleapi.shared.enums.ConditionalType;
+import org.project.fraudruleapi.shared.enums.ConditionType;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
@@ -20,8 +20,8 @@ public class IncludeEvaluator extends AbstractConditionEvaluator {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    public ConditionalType getSupportedType() {
-        return ConditionalType.INCLUDE;
+    public ConditionType getSupportedType() {
+        return ConditionType.INCLUDE;
     }
 
     @Override

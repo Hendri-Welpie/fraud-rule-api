@@ -33,7 +33,6 @@ class JsonSchemaValidatorTest {
     void setUp() throws IOException {
         MockitoAnnotations.openMocks(this);
 
-        // Mock resource to return a simple schema JSON
         String schemaJson = """
                 {
                     "type": "object",
@@ -80,9 +79,8 @@ class JsonSchemaValidatorTest {
 
     @Test
     void init_shouldLoadSchemaFromResource() throws IOException {
-        // Verify that getResource and getInputStream were called
         verify(resourceLoader, times(1)).getResource("classpath:rule-schema.json");
         verify(resource, times(1)).getInputStream();
-        assertNotNull(validator); // schema is loaded in @PostConstruct
+        assertNotNull(validator);
     }
 }

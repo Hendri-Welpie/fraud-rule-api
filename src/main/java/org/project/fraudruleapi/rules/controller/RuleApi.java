@@ -8,7 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.constraints.NotBlank;
-import org.project.fraudruleapi.rules.model.ErrorResponse;
+import org.project.fraudruleapi.shared.model.ErrorResponse;
 import org.project.fraudruleapi.rules.model.RuleDto;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;

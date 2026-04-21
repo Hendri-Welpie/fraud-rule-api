@@ -1,0 +1,13 @@
+# Secure mode overlay - use with:
+#   docker-compose -f docker-compose.yml -f docker-compose.secure.yml up -d
+#
+# This activates the 'secure' Spring profile which enables RBAC security.
+# Default users:
+#   admin/admin   -> ROLE_ADMIN   (full access)
+#   analyst/analyst -> ROLE_ANALYST (read-only fraud data + submit transactions)
+
+services:
+  fraud-rule-api:
+    environment:
+      - SPRING_PROFILES_ACTIVE=default,secure
+

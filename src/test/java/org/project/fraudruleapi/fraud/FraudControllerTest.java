@@ -6,13 +6,17 @@ import org.project.fraudruleapi.fraud.entity.FraudEntity;
 import org.project.fraudruleapi.fraud.model.FraudDetectionResponse;
 import org.project.fraudruleapi.fraud.model.TransactionDto;
 import org.project.fraudruleapi.fraud.service.FraudService;
+import org.project.fraudruleapi.shared.audit.AuditRepository;
 import org.project.fraudruleapi.shared.enums.ChannelType;
 import org.project.fraudruleapi.shared.enums.StatusType;
 import org.project.fraudruleapi.shared.enums.TransactionType;
 import org.project.fraudruleapi.shared.exception.ResourceNotFound;
+import org.project.fraudruleapi.shared.security.NoOpSecurityConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Flux;
@@ -25,7 +29,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @WebFluxTest(FraudController.class)
+@Import(NoOpSecurityConfig.class)
+@TestPropertySource(properties = {"app.security.enabled=false"})
 class FraudControllerTest {
+
+    @MockitoBean
+    private AuditRepository auditRepository;
 
     @MockitoBean
     private FraudService fraudService;
@@ -119,7 +128,7 @@ class FraudControllerTest {
     void getFlaggedItems_shouldReturnList() {
         FraudEntity fraud1 = FraudEntity.builder().id(1L).transactionId("t1").build();
         FraudEntity fraud2 = FraudEntity.builder().id(2L).transactionId("t2").build();
-        when(fraudService.getFlaggedItems()).thenReturn(Flux.just(fraud1, fraud2));
+        when(fraudService.getFlaggedItems(0, 50)).thenReturn(Flux.just(fraud1, fraud2));
 
         webTestClient.get().uri("/v1/api/fraud/flag-items")
                 .exchange()
@@ -150,5 +159,12 @@ class FraudControllerTest {
                 .expectStatus().isOk()
                 .expectBodyList(FraudEntity.class)
                 .hasSize(1);
+    }
+
+    @Test
+    void getFraudBySeverity_invalidSeverity_shouldReturnBadRequest() {
+        webTestClient.get().uri("/v1/api/fraud/severity/INVALID")
+                .exchange()
+                .expectStatus().isBadRequest();
     }
 }

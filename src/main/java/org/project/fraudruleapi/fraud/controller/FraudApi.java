@@ -12,7 +12,7 @@ import jakarta.validation.constraints.NotNull;
 import org.project.fraudruleapi.fraud.entity.FraudEntity;
 import org.project.fraudruleapi.fraud.model.FraudDetectionResponse;
 import org.project.fraudruleapi.fraud.model.TransactionDto;
-import org.project.fraudruleapi.rules.model.ErrorResponse;
+import org.project.fraudruleapi.shared.model.ErrorResponse;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -82,7 +82,7 @@ public interface FraudApi {
                     )
             )
     })
-    Mono<ResponseEntity<List<FraudEntity>>> getFlaggedItems();
+    Mono<ResponseEntity<List<FraudEntity>>> getFlaggedItems(int page, int size);
 
     @Operation(summary = "Get Flagged Item",
             description = "Retrieve a specific flagged fraud item by ID")

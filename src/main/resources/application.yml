@@ -3,6 +3,8 @@ server:
   shutdown: graceful
 
 app:
+  security:
+    enabled: false
   schedule:
     updateRules: "0 0/5 * * * *"
   fraud:
@@ -15,16 +17,30 @@ app:
       window-seconds: 60
       max-transactions: 10
     risk:
-      high-threshold: 80
-      medium-threshold: 50
-      low-threshold: 20
+      high-threshold: 60
+      medium-threshold: 30
+      low-threshold: 10
     amount:
       high-value-threshold: 1000000.00
       suspicious-threshold: 500000.00
+    cross-border:
+      enabled: true
+      domestic-currency: ZAR
+      weight: 15
+    self-transfer:
+      enabled: true
+      weight: 20
+    off-hours:
+      enabled: true
+      business-start-hour: 6
+      business-end-hour: 22
+      weight: 15
 
 spring:
   application:
     name: fraud-rule-api
+  codec:
+    max-in-memory-size: 256KB
   lifecycle:
     timeout-per-shutdown-phase: 30s
   datasource:
@@ -50,6 +66,7 @@ spring:
     schemas: fraud
     baseline-on-migrate: true
     validate-on-migrate: false
+    out-of-order: true
   cache:
     type: redis
     redis:
@@ -71,7 +88,6 @@ spring:
     username: postgres
     password: postgres
 
-# Reactive scheduler configuration
 reactor:
   schedulers:
     defaultBoundedElasticSize: 100
@@ -95,11 +111,11 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
-    export:
-      prometheus:
+  prometheus:
+    metrics:
+      export:
         enabled: true
 
-# OpenTelemetry configuration
 otel:
   service:
     name: ${spring.application.name}
@@ -108,7 +124,6 @@ otel:
   metrics:
     exporter: prometheus
 
-# Resilience4j configuration
 resilience4j:
   circuitbreaker:
     configs:
@@ -134,7 +149,7 @@ resilience4j:
         registerHealthIndicator: true
         timeoutDuration: 0
         limitRefreshPeriod: 1s
-        limitForPeriod: 100000
+        limitForPeriod: 50
     instances:
       fraudApi:
         baseConfig: default

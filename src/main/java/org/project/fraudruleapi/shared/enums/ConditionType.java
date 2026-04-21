@@ -1,16 +1,20 @@
 package org.project.fraudruleapi.shared.enums;
 
-public enum ConditionalType {
+public enum ConditionType {
     GREATER_THAN,
-    GREAT_THAN_OR_EQUAL,
+    GREATER_THAN_OR_EQUAL,
     LESS_THAN,
     LESS_THAN_OR_EQUAL,
-    EQUAL,
     EQUALS,
-    NOT_EQUAL,
     NOT_EQUALS,
     INCLUDE,
     AND,
     OR,
-    NOT
+    NOT,
+    BETWEEN,
+    REGEX,
+    STARTS_WITH,
+    ENDS_WITH,
+    CONTAINS
 }
+

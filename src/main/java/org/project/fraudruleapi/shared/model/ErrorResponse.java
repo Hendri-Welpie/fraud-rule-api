@@ -1,4 +1,4 @@
-package org.project.fraudruleapi.rules.model;
+package org.project.fraudruleapi.shared.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;

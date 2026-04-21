@@ -8,6 +8,7 @@ public record EvaluationResult(
         String ruleName,
         String description,
         boolean matched,
-        long evaluationTimeMs
+        long evaluationTimeMs,
+        int weight
 ) {}
 
